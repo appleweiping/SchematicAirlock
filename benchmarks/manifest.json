@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "corpus": {
+    "name": "portable_analog",
+    "provenance": "Clean-room original examples authored for this repository; no PDK, vendor model, textbook listing, or third-party netlist was copied.",
+    "license": "MIT",
+    "files": [
+      {"path": "corpus/portable_analog/primitives.lib", "sha256": "435fd4fa2f68c7c50263ddf733d5edf027fa7076684e6165bac25b9db902ee6c"},
+      {"path": "corpus/portable_analog/rc_sensor_frontend.sp", "sha256": "be60f1bee20dc3a2d8b2d58348f219bd723dcaaa4a879267255935fa5b42e4c4"},
+      {"path": "corpus/portable_analog/two_stage_ota.sp", "sha256": "c7d33fdc42b9cb66c5c9b0fc74c3dc4a8cb06e2c038912f1a5eca69268ea51fc"}
+    ]
+  },
+  "runtime": {
+    "distribution_version": "0.2.0",
+    "package_tree_sha256": "70f7788459eb65d702ffa4e0084bc413d5a5ad38de7466ecdf963a33b1167f98",
+    "harness_sha256": "87c2f63edbcead13f7fc73b4bf0407e446f3c11a28b671afbf84cef6e2347ca5"
+  },
+  "command": "python benchmarks/benchmark.py --iterations 25",
+  "expected": {"decks_per_iteration": 2, "devices_per_iteration": 23, "findings_per_iteration": 9},
+  "workload_sha256": "18d346fa7e641cd78b094985ec156e9b407253cd622c0c7d929b7285bd0e9cde",
+  "timing_policy": "Informational only; compare on the same host, interpreter, and power mode."
+}

@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 
 from schematic_airlock.bundle import ArtifactBundle, BundleLimits, BundleSource, MemoryBundle
 from schematic_airlock.checks import CheckContext, run_checks
 from schematic_airlock.circuit_graph import build_circuit_graph
-from schematic_airlock.domain import AuditReport, AuditStats, Decision, Finding, Severity
+from schematic_airlock.domain import (
+    AuditReport,
+    AuditStats,
+    AuditStructure,
+    Decision,
+    Finding,
+    Severity,
+)
 from schematic_airlock.include_graph import load_include_graph
 from schematic_airlock.policy import AuditPolicy, load_policy
 
@@ -28,6 +36,48 @@ def _risk_score(findings: tuple[Finding, ...]) -> int:
     for finding in findings:
         per_code[finding.code] = min(45, per_code.get(finding.code, 0) + weights[finding.severity])
     return min(100, sum(per_code.values()))
+
+
+def _structure(includes: object, graph: object) -> AuditStructure:
+    """Collect the contract subset without trusting a producer summary."""
+
+    from schematic_airlock.circuit_graph import CircuitGraph
+    from schematic_airlock.include_graph import IncludeGraph
+
+    if not isinstance(includes, IncludeGraph) or not isinstance(graph, CircuitGraph):
+        raise TypeError("structural facts require parsed include and circuit graphs")
+    parameters: set[str] = set()
+    models: set[str] = set()
+    include_count = 0
+    for deck in includes.decks:
+        include_count += len(deck.includes)
+        for directive in deck.directives:
+            if directive.name == "param":
+                parameters.update(
+                    item.split("=", 1)[0].casefold()
+                    for item in directive.arguments
+                    if "=" in item and item.split("=", 1)[0]
+                )
+            elif directive.name == "model" and directive.arguments:
+                models.add(directive.arguments[0].casefold())
+        for subcircuit in deck.subcircuits:
+            parameters.update(name.casefold() for name, _value in subcircuit.parameters)
+            for directive in subcircuit.directives:
+                if directive.name == "param":
+                    parameters.update(
+                        item.split("=", 1)[0].casefold()
+                        for item in directive.arguments
+                        if "=" in item and item.split("=", 1)[0]
+                    )
+                elif directive.name == "model" and directive.arguments:
+                    models.add(directive.arguments[0].casefold())
+    families = Counter(device.element.kind.upper() for device in graph.devices)
+    return AuditStructure(
+        include_count,
+        tuple(sorted(families.items())),
+        tuple(sorted(parameters)),
+        tuple(sorted(models)),
+    )
 
 
 def _audit_bundle(bundle: BundleSource, policy: AuditPolicy) -> AuditReport:
@@ -56,6 +106,7 @@ def _audit_bundle(bundle: BundleSource, policy: AuditPolicy) -> AuditReport:
         files=digests,
         findings=findings,
         stats=stats,
+        structure=_structure(includes, graph),
     )
 
 

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path, PureWindowsPath
 from typing import Protocol, runtime_checkable
 
+from schematic_airlock._strict_json import load_strict_json
 from schematic_airlock.domain import FileDigest, InputError
 
 _NETLIST_EXTENSIONS = {".sp", ".spi", ".cir", ".ckt", ".net"}
@@ -71,10 +71,7 @@ class ArtifactBundle:
         manifest_path = bundle.root / "manifest.json"
         if manifest_path.exists():
             manifest_text = bundle.read_text("manifest.json")
-            try:
-                manifest = json.loads(manifest_text)
-            except json.JSONDecodeError as exc:
-                raise InputError(f"manifest.json is invalid JSON: {exc.msg}") from exc
+            manifest = load_strict_json(manifest_text, context="manifest JSON")
             bundle.manifest = _validate_manifest(manifest)
         manifest_entry = bundle.manifest.get("entry")
         selected = entry or (manifest_entry if isinstance(manifest_entry, str) else None)
@@ -111,8 +108,11 @@ class ArtifactBundle:
         if len(self._texts) >= self.limits.max_files:
             raise InputError(f"bundle exceeds the {self.limits.max_files}-file read budget")
         path = self.root / canonical
+        remaining_total = max(0, self.limits.max_total_bytes - self._total_bytes)
+        read_budget = min(max(0, self.limits.max_file_bytes), remaining_total)
         try:
-            data = path.read_bytes()
+            with path.open("rb") as stream:
+                data = stream.read(read_budget + 1)
         except OSError as exc:
             raise InputError(f"cannot read {canonical}: {exc}") from exc
         if len(data) > self.limits.max_file_bytes:
@@ -207,7 +207,9 @@ def _validate_manifest(value: object) -> dict[str, object]:
     unknown = sorted(set(value) - allowed)
     if unknown:
         raise InputError(f"manifest.json has unknown fields: {', '.join(unknown)}")
-    schema_version = value.get("schema_version", 1)
+    if "schema_version" not in value:
+        raise InputError("manifest.json schema_version is required")
+    schema_version = value["schema_version"]
     if (
         isinstance(schema_version, bool)
         or not isinstance(schema_version, int)
@@ -217,6 +219,9 @@ def _validate_manifest(value: object) -> dict[str, object]:
     entry = value.get("entry")
     if entry is not None and (not isinstance(entry, str) or not entry.strip()):
         raise InputError("manifest entry must be a non-empty string")
+    description = value.get("description")
+    if description is not None and (not isinstance(description, str) or not description.strip()):
+        raise InputError("manifest description must be a non-empty string")
     ports = value.get("intended_ports", {})
     if not isinstance(ports, dict):
         raise InputError("manifest intended_ports must be an object")

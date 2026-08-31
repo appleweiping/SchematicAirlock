@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:schematic-airlock:audit-report:1",
+  "title": "SchematicAirlock audit report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "tool", "decision", "risk_score", "root", "entry",
+    "bundle_sha256", "policy_sha256", "files", "stats", "findings"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "SchematicAirlock"},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "decision": {"enum": ["allow", "review", "deny"]},
+    "risk_score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "root": {"type": "string", "minLength": 1},
+    "entry": {"$ref": "#/$defs/path"},
+    "bundle_sha256": {"$ref": "#/$defs/digest"},
+    "policy_sha256": {"$ref": "#/$defs/digest"},
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": {"$ref": "#/$defs/path"},
+          "size": {"type": "integer", "minimum": 0},
+          "sha256": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "stats": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files", "bytes", "logical_lines", "devices", "nets", "subcircuits",
+        "expanded_instances"
+      ],
+      "properties": {
+        "files": {"type": "integer", "minimum": 0},
+        "bytes": {"type": "integer", "minimum": 0},
+        "logical_lines": {"type": "integer", "minimum": 0},
+        "devices": {"type": "integer", "minimum": 0},
+        "nets": {"type": "integer", "minimum": 0},
+        "subcircuits": {"type": "integer", "minimum": 0},
+        "expanded_instances": {"type": "integer", "minimum": 0}
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/finding"}
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\).+$"
+    },
+    "location": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["path", "line", "column"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "line": {"type": "integer", "minimum": 1},
+        "column": {"type": "integer", "minimum": 1}
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "code", "title", "severity", "message", "evidence", "remediation",
+        "metadata", "location"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "code": {"type": "string", "minLength": 1},
+        "title": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["info", "review", "deny"]},
+        "message": {"type": "string"},
+        "evidence": {"type": "string"},
+        "remediation": {"type": "string"},
+        "metadata": {"type": "object"},
+        "location": {"$ref": "#/$defs/location"}
+      }
+    }
+  }
+}

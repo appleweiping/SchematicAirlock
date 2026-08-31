@@ -123,6 +123,54 @@ def test_load_report_rejects_confusing_documents(value: str) -> None:
         load_report(value)
 
 
+@pytest.mark.parametrize(
+    "replacement",
+    [
+        '"schema_version":true',
+        '"schema_version":1.0',
+        '"schema_version":1,"schema_version":1',
+        '"risk_score":NaN',
+        '"risk_score":1e999',
+    ],
+)
+def test_load_report_rejects_ambiguous_json_scalars(replacement: str) -> None:
+    report = audit_text("R1 a 0 1k\n")
+    text = report_json(report)
+    if replacement.startswith('"schema_version"'):
+        text = text.replace('"schema_version":1', replacement)
+    else:
+        text = text.replace(f'"risk_score":{report.risk_score}', replacement)
+    with pytest.raises(InputError):
+        load_report(text)
+
+
+def test_load_report_rejects_unknown_fields_and_deep_metadata() -> None:
+    value = audit_text(".control\n").as_dict()
+    value["unknown"] = True
+    with pytest.raises(InputError, match="fields"):
+        load_report(json.dumps(value))
+
+    value.pop("unknown")
+    nested: object = "leaf"
+    for _ in range(70):
+        nested = [nested]
+    value["findings"][0]["metadata"] = {"nested": nested}
+    with pytest.raises(InputError, match="complexity"):
+        load_report(json.dumps(value))
+
+
+def test_load_report_validates_tool_and_complete_records() -> None:
+    value = audit_text("R1 a 0 1k\n").as_dict()
+    value["tool"] = {"name": "SchematicAirlock"}
+    with pytest.raises(InputError, match="tool fields"):
+        load_report(json.dumps(value))
+
+    value = audit_text("R1 a 0 1k\n").as_dict()
+    value["stats"]["files"] = True
+    with pytest.raises(InputError, match="non-negative integer"):
+        load_report(json.dumps(value))
+
+
 def test_explain_rejects_unknown_id() -> None:
     report = load_report(report_json(audit_text("R1 a 0 1k\n")))
     with pytest.raises(InputError, match="not present"):
@@ -243,6 +291,15 @@ def test_cli_writes_report_and_explains_it(tmp_path: Path) -> None:
     explanation = io.StringIO()
     assert main(["explain", str(destination), finding_id], stdout=explanation) == EXIT_OK
     assert "EXEC001" in explanation.getvalue()
+
+
+def test_cli_explain_rejects_oversized_report_without_traceback(tmp_path: Path) -> None:
+    source = tmp_path / "oversized.json"
+    source.write_text(" " * 1_048_577, encoding="utf-8")
+    errors = io.StringIO()
+    assert main(["explain", str(source), "missing"], stderr=errors) == EXIT_INPUT
+    assert "byte input limit" in errors.getvalue()
+    assert "Traceback" not in errors.getvalue()
 
 
 def test_cli_fingerprint_default_policy() -> None:

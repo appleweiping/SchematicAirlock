@@ -1,10 +1,10 @@
 [build-system]
-requires = ["hatchling>=1.27,<2"]
+requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "schematic-airlock"
-version = "0.1.0"
+version = "0.2.0"
 description = "Deterministic offline safety checks for generated SPICE artifacts"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,7 +27,10 @@ dependencies = []
 [project.optional-dependencies]
 dev = [
   "bandit>=1.8",
-  "build>=1.2",
+  "build==1.6.0",
+  "twine==7.0.0",
+  "hatchling==1.32.0",
+  "jsonschema>=4.23",
   "mypy>=1.15",
   "pytest>=8.3",
   "pytest-cov>=6",
@@ -35,7 +38,7 @@ dev = [
 ]
 
 [project.scripts]
-schematic-airlock = "schematic_airlock.cli:main"
+schematic-airlock = "schematic_airlock.cli:entrypoint"
 
 [project.urls]
 Documentation = "https://github.com/appleweiping/SchematicAirlock#readme"
@@ -43,7 +46,8 @@ Issues = "https://github.com/appleweiping/SchematicAirlock/issues"
 Source = "https://github.com/appleweiping/SchematicAirlock"
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/examples", "/docs", "/*.md", "/LICENSE"]
+include = ["/src", "/tests", "/examples", "/docs", "/corpus", "/benchmarks", "/*.md", "/LICENSE", "/CITATION.cff"]
+exclude = ["/.github", "/uv.lock"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/schematic_airlock"]

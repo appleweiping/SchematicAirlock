@@ -8,7 +8,7 @@ from enum import StrEnum
 from hashlib import sha256
 from typing import Any
 
-TOOL_VERSION = "0.1.0"
+from schematic_airlock._version import __version__
 
 
 class Decision(StrEnum):
@@ -120,6 +120,16 @@ class AuditStats:
 
 
 @dataclass(frozen=True, slots=True)
+class AuditStructure:
+    """Case-normalized structural facts retained for independent interop checks."""
+
+    includes: int
+    element_families: tuple[tuple[str, int], ...]
+    parameters: tuple[str, ...]
+    models: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class AuditReport:
     """Complete deterministic result of an audit."""
 
@@ -132,7 +142,8 @@ class AuditReport:
     files: tuple[FileDigest, ...]
     findings: tuple[Finding, ...]
     stats: AuditStats
-    tool_version: str = TOOL_VERSION
+    structure: AuditStructure = AuditStructure(0, (), (), ())
+    tool_version: str = __version__
 
     def as_dict(self) -> dict[str, object]:
         return {
