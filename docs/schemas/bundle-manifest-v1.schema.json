@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:schematic-airlock:bundle-manifest:1",
+  "title": "SchematicAirlock bundle manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "entry": {"type": "string", "minLength": 1},
+    "description": {"type": "string", "minLength": 1},
+    "intended_ports": {
+      "type": "object",
+      "propertyNames": {"minLength": 1},
+      "additionalProperties": {
+        "enum": ["input", "output", "inout", "supply", "ground", "bias"]
+      }
+    }
+  }
+}

@@ -96,7 +96,7 @@ strict `manifest.json`:
 ```
 
 Supported port roles are `input`, `output`, `inout`, `supply`, `ground`, and
-`bias`. Unknown manifest fields are rejected. Without a manifest, pass
+`bias`. `schema_version` is required and unknown manifest fields are rejected. Without a manifest, pass
 `--entry`, or place exactly one recognized top-level netlist in the directory.
 
 Relative `.include` and file-style `.lib` references are followed. Absolute
@@ -191,8 +191,9 @@ schematic-airlock audit examples/unsafe_opamp --format json --output report.json
 schematic-airlock explain report.json <FINDING_ID_FROM_REPORT>
 ```
 
-Use the real ID printed in your report. The `explain` command validates the
-report schema and prints its evidence and remediation.
+Use the real ID printed in your report. The `explain` command reads at most 1 MiB, rejects duplicate
+keys and ambiguous numbers, validates the complete versioned report schema, and prints its evidence
+and remediation.
 
 ## Python API
 
@@ -227,6 +228,15 @@ models.
 
 See [docs/architecture.md](docs/architecture.md) for invariants and data flow,
 and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+## Validation and interoperability
+
+The clean-room portable analog corpus supports deterministic fuzz and benchmark entry points. See
+[docs/validation.md](docs/validation.md) for provenance and reproduction commands.
+`schematic-airlock interop-check ARTIFACT SUMMARY.json` compares a SpiceTrellis observation with a
+fresh audit; a match never relaxes the policy decision. It uses the same default
+`--fail-on review` gate as `audit`; pass `--fail-on deny` only when review
+findings are intentionally non-blocking.
 
 ## License
 

@@ -124,3 +124,7 @@ A new check should:
 New parser support must preserve all resource bounds and source locations.
 Features that require executing a model, resolving an ambient library, or
 guessing dialect-specific behavior belong outside this process boundary.
+
+Structural summaries from other tools remain untrusted input. The interop adapter enforces strict
+JSON, confined portable paths, content digests, and a fresh local audit before comparing shared
+counts. A comparison cannot lower an audit decision.

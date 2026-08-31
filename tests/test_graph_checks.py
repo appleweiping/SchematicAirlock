@@ -211,7 +211,8 @@ def test_required_policy_port_must_exist() -> None:
 
 def test_manifest_output_with_no_evident_driver_is_reviewed(tmp_path: Path) -> None:
     (tmp_path / "manifest.json").write_text(
-        '{"entry":"top.sp","intended_ports":{"out":"output"}}', encoding="utf-8"
+        '{"schema_version":1,"entry":"top.sp","intended_ports":{"out":"output"}}',
+        encoding="utf-8",
     )
     (tmp_path / "top.sp").write_text("C1 out 0 1p\nM1 d out 0 0 nch\n", encoding="utf-8")
     bundle = ArtifactBundle.open(tmp_path)

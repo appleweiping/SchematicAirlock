@@ -58,7 +58,9 @@ def test_directory_infers_exactly_one_top_level_netlist(tmp_path: Path) -> None:
         [],
         {"schema_version": 2, "entry": "a.sp"},
         {"schema_version": True, "entry": "a.sp"},
+        {"entry": "a.sp"},
         {"entry": ""},
+        {"schema_version": 1, "entry": "a.sp", "description": 7},
         {"entry": "a.sp", "unknown": True},
         {"entry": "a.sp", "intended_ports": []},
         {"entry": "a.sp", "intended_ports": {"": "input"}},
@@ -75,7 +77,24 @@ def test_manifest_validation_rejects_ambiguous_contract(tmp_path: Path, manifest
 
 def test_invalid_manifest_json_is_input_error(tmp_path: Path) -> None:
     write(tmp_path / "manifest.json", "{")
-    with pytest.raises(InputError, match="invalid JSON"):
+    with pytest.raises(InputError, match="invalid manifest JSON"):
+        ArtifactBundle.open(tmp_path)
+
+
+def test_manifest_rejects_duplicate_and_nonfinite_json(tmp_path: Path) -> None:
+    write(tmp_path / "a.sp", "R1 a 0 1\n")
+    write(
+        tmp_path / "manifest.json",
+        '{"schema_version":1,"entry":"a.sp","entry":"other.sp"}',
+    )
+    with pytest.raises(InputError, match="duplicate"):
+        ArtifactBundle.open(tmp_path)
+
+    write(
+        tmp_path / "manifest.json",
+        '{"schema_version":1,"entry":"a.sp","description":NaN}',
+    )
+    with pytest.raises(InputError, match="non-finite"):
         ArtifactBundle.open(tmp_path)
 
 
@@ -114,6 +133,38 @@ def test_bundle_rejects_nul_invalid_utf8_and_size_budgets(tmp_path: Path) -> Non
     limited = ArtifactBundle.open(tmp_path / "large.sp", limits=BundleLimits(1, 4, 4))
     with pytest.raises(InputError, match="per-file"):
         limited.read_text("large.sp")
+
+
+def test_bundle_stops_reading_at_the_smallest_byte_budget(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "large.sp"
+    source.write_bytes(b"x" * 100)
+    requested_sizes: list[int] = []
+    original_open = Path.open
+
+    class TrackedReader:
+        def __init__(self, stream: object) -> None:
+            self.stream = stream
+
+        def __enter__(self) -> TrackedReader:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            self.stream.close()  # type: ignore[attr-defined]
+
+        def read(self, size: int = -1) -> bytes:
+            requested_sizes.append(size)
+            return self.stream.read(size)  # type: ignore[attr-defined,no-any-return]
+
+    def tracked_open(path: Path, *args: object, **kwargs: object) -> TrackedReader:
+        return TrackedReader(original_open(path, *args, **kwargs))
+
+    monkeypatch.setattr(Path, "open", tracked_open)
+    bundle = ArtifactBundle.open(source, limits=BundleLimits(1, 50, 4))
+    with pytest.raises(InputError, match="per-file"):
+        bundle.read_text("large.sp")
+    assert requested_sizes == [5]
 
 
 def test_bundle_enforces_total_and_file_count_budgets(tmp_path: Path) -> None:

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:org.spice-tools:structural-summary:1",
+  "title": "Portable SPICE structural summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "producer", "files", "structure"],
+  "properties": {
+    "schema": {"const": "org.spice-tools.structural-summary"},
+    "schema_version": {"const": 1},
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"const": "SpiceTrellis"},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "bytes", "sha256"],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*\\\\).+$"
+          },
+          "bytes": {"type": "integer", "minimum": 0},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "structure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files",
+        "includes",
+        "subcircuits",
+        "element_families",
+        "parameters",
+        "models"
+      ],
+      "properties": {
+        "files": {"type": "integer", "minimum": 0},
+        "includes": {"type": "integer", "minimum": 0},
+        "subcircuits": {"type": "integer", "minimum": 0},
+        "element_families": {
+          "type": "object",
+          "propertyNames": {"minLength": 1},
+          "additionalProperties": {"type": "integer", "minimum": 0}
+        },
+        "parameters": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "models": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}
