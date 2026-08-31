@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "entry": "main.sp",
+  "description": "Small differential stage used for the command-line demonstration",
+  "intended_ports": {
+    "vinp": "input",
+    "vinn": "input",
+    "vout": "output",
+    "vdd": "supply",
+    "0": "ground"
+  }
+}

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="290" viewBox="0 0 1180 290" role="img" aria-labelledby="title description">
+  <title id="title">SchematicAirlock safe artifact command-line demonstration</title>
+  <desc id="description">Recorded output from auditing the reviewed_opamp example with the installed command-line program.</desc>
+  <rect width="1180" height="290" rx="12" fill="#111827"/>
+  <circle cx="24" cy="22" r="6" fill="#fb7185"/>
+  <circle cx="44" cy="22" r="6" fill="#fbbf24"/>
+  <circle cx="64" cy="22" r="6" fill="#34d399"/>
+  <g font-family="ui-monospace, SFMono-Regular, Consolas, monospace" font-size="15">
+    <text x="22" y="54" fill="#93c5fd">$ schematic-airlock audit examples/reviewed_opamp</text>
+    <text x="22" y="84" fill="#6ee7b7">SchematicAirlock: ALLOW (risk 0/100)</text>
+    <text x="22" y="112" fill="#e5e7eb">entry: main.sp</text>
+    <text x="22" y="140" fill="#e5e7eb">bundle: sha256:28c62ce8de922595cb91905ca02a1d9108a14f386bf9bdc58590c02e54f241a7</text>
+    <text x="22" y="168" fill="#e5e7eb">policy: sha256:edad7b3f2e8cef38c073db26a8a2d938b97b3a660cca6d279d30c0eb8282c5db</text>
+    <text x="22" y="196" fill="#e5e7eb">stats: 3 files, 10 devices, 12 nets, 10 expanded instances</text>
+    <text x="22" y="224" fill="#e5e7eb">findings: none</text>
+    <text x="22" y="260" fill="#9ca3af">exit code: 0</text>
+  </g>
+</svg>

@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a bounded check, parser capability, or reporting improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Artifact safety problem
+      description: Explain the concrete risk or review ambiguity.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Proposed static evidence
+      description: State what can be proven without running a simulator.
+    validations:
+      required: true
+  - type: textarea
+    id: bounds
+    attributes:
+      label: Resource and false-positive bounds
+      description: Describe limits and cases that still require human review.
+    validations:
+      required: true
+  - type: textarea
+    id: interface
+    attributes:
+      label: Expected API or CLI behavior
+    validations:
+      required: true

@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "entry": "main.sp",
+  "description": "Intentionally rejected demonstration artifact",
+  "intended_ports": {
+    "vin": "input",
+    "vout": "output",
+    "vdd": "supply",
+    "0": "ground"
+  }
+}

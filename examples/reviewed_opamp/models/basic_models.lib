@@ -1,0 +1,8 @@
+.model nch nmos level=1
+.subckt diff_core inp inn out vdd vss
+M1 nleft inp tail vss nch
+M2 out inn tail vss nch
+R1 vdd nleft 5k
+R2 vdd out 5k
+I1 tail vss 100u
+.ends diff_core

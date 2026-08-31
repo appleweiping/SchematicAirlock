@@ -1,0 +1,233 @@
+# SchematicAirlock
+
+[![CI](https://github.com/appleweiping/SchematicAirlock/actions/workflows/ci.yml/badge.svg)](https://github.com/appleweiping/SchematicAirlock/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/appleweiping/SchematicAirlock/actions/workflows/codeql.yml/badge.svg)](https://github.com/appleweiping/SchematicAirlock/actions/workflows/codeql.yml)
+[![Python 3.11–3.14](https://img.shields.io/badge/python-3.11%E2%80%933.14-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
+
+SchematicAirlock is a deterministic, offline safety gate for SPICE artifacts
+produced by people or generative tools. It opens only files inside an explicit
+bundle, parses a bounded language subset without invoking a simulator, builds a
+scoped connectivity graph, and returns `allow`, `review`, or `deny` with stable
+finding identifiers and concrete remediation.
+
+It is designed for a pre-simulation CI boundary. An `allow` result means that
+the artifact passed the configured static checks; it is not a claim that the
+circuit is correct, manufacturable, stable, or safe to fabricate.
+
+![A real SchematicAirlock CLI run](docs/assets/demo.svg)
+
+## Why an airlock
+
+A generated netlist is executable input to many simulators. It can reference
+ambient files, request enormous analyses, load extensions, or encode a circuit
+whose obvious electrical invariants are broken. SchematicAirlock treats the
+artifact as untrusted data and makes the acceptance decision reproducible.
+
+The audit never runs a simulator, shell, model compiler, or subprocess. It does
+not access the network or expand environment variables. Includes must resolve
+to regular UTF-8 files within the submitted directory.
+
+## Installation
+
+Python 3.11 or newer is required. The runtime has no third-party dependencies.
+
+```console
+python -m pip install .
+schematic-airlock --help
+```
+
+For development:
+
+```console
+python -m pip install -e ".[dev]"
+ruff check .
+ruff format --check .
+pytest
+python -m build
+```
+
+## First audit
+
+Audit a single netlist:
+
+```console
+schematic-airlock audit design.sp
+```
+
+Audit a directory with a manifest and emit deterministic JSON:
+
+```console
+schematic-airlock audit examples/reviewed_opamp --format json --pretty
+```
+
+The default `--fail-on review` exits with code 2 for both `review` and `deny`.
+Use `--fail-on deny` when review findings should remain CI-successful:
+
+```console
+schematic-airlock audit design.sp --fail-on deny
+```
+
+Exit codes are stable:
+
+| Code | Meaning |
+| ---: | --- |
+| 0 | Decision is below the chosen failure threshold |
+| 2 | Audit completed and the gate threshold was reached |
+| 3 | The input, policy, report, or filesystem operation was invalid |
+
+## Bundle contract
+
+A bundle is either one netlist file or a directory. A directory may contain a
+strict `manifest.json`:
+
+```json
+{
+  "schema_version": 1,
+  "entry": "main.sp",
+  "description": "Two-stage demonstration amplifier",
+  "intended_ports": {
+    "vin": "input",
+    "vout": "output",
+    "vdd": "supply",
+    "0": "ground"
+  }
+}
+```
+
+Supported port roles are `input`, `output`, `inout`, `supply`, `ground`, and
+`bias`. Unknown manifest fields are rejected. Without a manifest, pass
+`--entry`, or place exactly one recognized top-level netlist in the directory.
+
+Relative `.include` and file-style `.lib` references are followed. Absolute
+paths, URL-like targets, root escapes, broken references, non-UTF-8 text, NUL
+bytes, symlink escapes, and read-budget overruns become input errors or denied
+findings. Only files actually read participate in the bundle fingerprint.
+
+## Checks
+
+SchematicAirlock reports findings in these families:
+
+- include confinement, missing files, include cycles, and depth limits;
+- parse failures, duplicate definitions, undefined calls, port-count mismatch,
+  recursive hierarchy, unreachable subcircuits, and expansion limits;
+- executable simulator commands and unrecognized directives or elements;
+- behavioral sources and passive values that are invalid or not statically
+  evaluable;
+- excessive `.tran`, `.dc`, `.ac`, `.step`, and PWL point estimates;
+- missing declared ports, apparently undriven outputs, dangling internal nets,
+  and floating MOS gates;
+- conflicting parallel ideal voltage sources, excessive source voltage, and
+  zero-ohm connections between configured power and ground rails.
+- hierarchy-aware rail/source checks, bounded parameter expressions, and
+  explicit review of dynamic source waveforms whose levels cannot be bounded.
+
+Every check is conservative. A review finding identifies an ambiguity that
+needs engineering judgment. A deny finding identifies a violated artifact
+contract or a high-confidence unsafe condition. Policy can override the
+severity of a specific finding code.
+
+## Policy
+
+Policy files use strict TOML. Unknown fields fail validation, which prevents a
+misspelling from silently weakening a gate.
+
+Limit fields must be TOML integers; booleans, floats, and numeric strings are
+rejected. The voltage ceiling must be a positive finite number. Include depth
+is checked for every traversal path, including deeper paths to an already
+parsed file.
+
+Top-level parameter assignments follow textual SPICE include order: an
+included file is expanded at its `.include`/file-style `.lib` insertion point,
+including nested references. Repeating the same include deterministically
+replays its parameter assignments and produces `INCL003` review evidence so
+the duplication cannot pass silently.
+
+```toml
+schema_version = 1
+
+[limits]
+max_files = 64
+max_total_bytes = 5000000
+max_file_bytes = 1000000
+max_include_depth = 12
+max_expanded_instances = 50000
+max_analysis_points = 250000
+max_pwl_points = 5000
+
+[electrical]
+required_ports = ["vin", "vout", "vdd", "0"]
+ground_nets = ["0", "gnd", "vss"]
+power_nets = ["vdd", "vcc"]
+max_abs_source_voltage = 6.0
+
+[rules]
+unknown_directive = "review"
+unknown_element = "review"
+behavioral_source = "deny"
+
+[rules.severity_overrides]
+GRAPH006 = "info"
+```
+
+Validate and fingerprint a policy:
+
+```console
+schematic-airlock policy-check examples/policy.toml
+schematic-airlock fingerprint --policy examples/policy.toml
+```
+
+## Stable reports and explanations
+
+Reports contain no timestamp. Files, findings, metadata, and JSON keys have a
+stable order. Bundle and policy SHA-256 values make the decision inputs
+explicit. Finding IDs are derived from code, location, and message; the same
+finding in the same artifact receives the same ID.
+
+Write a report, then explain one finding without re-auditing:
+
+```console
+schematic-airlock audit examples/unsafe_opamp --format json --output report.json
+schematic-airlock explain report.json <FINDING_ID_FROM_REPORT>
+```
+
+Use the real ID printed in your report. The `explain` command validates the
+report schema and prints its evidence and remediation.
+
+## Python API
+
+```python
+from schematic_airlock import AuditPolicy, audit_path, audit_text
+
+report = audit_path("artifact", policy="policy.toml")
+print(report.decision, report.risk_score)
+for finding in report.findings:
+    print(finding.finding_id, finding.code, finding.message)
+
+memory_report = audit_text("V1 vdd 0 1.8\nR1 vdd out 2k\n.end\n")
+assert memory_report.bundle_sha256
+```
+
+All public result objects are immutable dataclasses. `AuditReport.as_dict()`
+returns the versioned JSON representation.
+
+## Security boundary and limitations
+
+The parser recognizes a deliberately small structural subset. It does not
+evaluate arbitrary SPICE functions, conditionals, simulator-specific macro
+languages, encrypted models, Verilog-A, or behavioral expressions. A circuit
+that depends on unsupported semantics should be reviewed or rejected rather
+than interpreted optimistically.
+
+Static connectivity cannot prove gain, phase margin, noise, operating region,
+thermal behavior, electrostatic discharge tolerance, or process-rule
+compliance. Run appropriate simulation and physical verification only after an
+artifact passes this gate, in a separately isolated environment with trusted
+models.
+
+See [docs/architecture.md](docs/architecture.md) for invariants and data flow,
+and [SECURITY.md](SECURITY.md) for vulnerability reporting.
+
+## License
+
+SchematicAirlock is available under the MIT License.

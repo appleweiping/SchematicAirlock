@@ -1,0 +1,24 @@
+schema_version = 1
+
+[limits]
+max_files = 32
+max_total_bytes = 1000000
+max_file_bytes = 250000
+max_include_depth = 8
+max_expanded_instances = 10000
+max_analysis_points = 100000
+max_pwl_points = 1000
+
+[electrical]
+required_ports = ["vin", "vout", "vdd", "0"]
+ground_nets = ["0", "gnd", "vss"]
+power_nets = ["vdd", "vcc"]
+max_abs_source_voltage = 6.0
+
+[rules]
+unknown_directive = "review"
+unknown_element = "review"
+behavioral_source = "deny"
+
+[rules.severity_overrides]
+GRAPH006 = "info"

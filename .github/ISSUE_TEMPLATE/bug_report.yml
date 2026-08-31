@@ -1,0 +1,42 @@
+name: Bug report
+description: Report reproducible incorrect audit behavior
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach confidential netlists or active exploit payloads.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: SchematicAirlock and Python versions
+    validations:
+      required: true
+  - type: textarea
+    id: artifact
+    attributes:
+      label: Minimal inert artifact
+      description: Provide the smallest original netlist that reproduces the behavior.
+      render: spice
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Linux, macOS, Windows, Other]
+    validations:
+      required: true

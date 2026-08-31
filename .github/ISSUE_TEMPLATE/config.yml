@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/appleweiping/SchematicAirlock/security/advisories/new
+    about: Report path escapes, code execution, or denial-of-service privately.

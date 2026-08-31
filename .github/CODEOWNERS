@@ -1,0 +1,5 @@
+* @appleweiping
+/.github/ @appleweiping
+/src/schematic_airlock/bundle.py @appleweiping
+/src/schematic_airlock/lex.py @appleweiping
+/src/schematic_airlock/parse.py @appleweiping
