@@ -12,7 +12,7 @@
   },
   "runtime": {
     "distribution_version": "0.2.0",
-    "package_tree_sha256": "70f7788459eb65d702ffa4e0084bc413d5a5ad38de7466ecdf963a33b1167f98",
+    "package_tree_sha256": "287d59f29a919d0b7afd33253e20c8b7920938d83ac68828f3b6966ac89494ad",
     "harness_sha256": "87c2f63edbcead13f7fc73b4bf0407e446f3c11a28b671afbf84cef6e2347ca5"
   },
   "command": "python benchmarks/benchmark.py --iterations 25",

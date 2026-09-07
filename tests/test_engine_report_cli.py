@@ -61,6 +61,10 @@ def test_policy_severity_override_changes_final_decision() -> None:
                 "severity_overrides": {
                     "ELEM001": "info",
                     "NET001": "info",
+                    # This one-line deck names no ground, which the solvability
+                    # check reports. The override is what this test is about,
+                    # so it covers that finding too.
+                    "SOLVE001": "info",
                 }
             }
         }
