@@ -20,6 +20,12 @@ from schematic_airlock.domain import Finding, Severity, SourceLocation
 from schematic_airlock.include_graph import IncludeGraph
 from schematic_airlock.parse import Directive
 from schematic_airlock.policy import AuditPolicy
+from schematic_airlock.solvability import (
+    MAX_REPORTED_NODES,
+    floating_islands,
+    has_ground,
+    voltage_source_loops,
+)
 from schematic_airlock.units import evaluate_expression, parameter_assignments, parse_number
 
 
@@ -726,6 +732,72 @@ def _rail_short_findings(context: CheckContext) -> list[Finding]:
     return findings
 
 
+def _solvability_findings(context: CheckContext) -> list[Finding]:
+    """Refuse the operating points a simulator would refuse.
+
+    These are the runs a pre-simulation gate exists to save: the netlist parses,
+    describes a plausible circuit, and then makes the first DC solve fail with a
+    singular matrix.
+    """
+
+    findings: list[Finding] = []
+    elements = [
+        (device.qualified_name, device.element) for device in _electrical_elements(context.graph)
+    ]
+    if not elements:
+        return findings
+
+    grounds = context.policy.electrical.ground_nets
+    if not has_ground(elements, grounds):
+        # A deck with no ground at all is a fragment or a naming mismatch, not a
+        # circuit with one broken connection, so it earns one finding rather
+        # than one for every node it contains.
+        findings.append(
+            _finding(
+                context,
+                "SOLVE001",
+                "No ground reference",
+                Severity.REVIEW,
+                "no element connects to any configured ground net",
+                remediation=("Reference node 0, or configure the ground net names this deck uses."),
+                metadata={"ground_nets": list(grounds)},
+            )
+        )
+        return findings
+
+    for island in floating_islands(elements, grounds):
+        findings.append(
+            _finding(
+                context,
+                "SOLVE002",
+                "No DC path to ground",
+                Severity.DENY,
+                f"{len(island.nodes)} node(s) have no conducting path to ground: {island.summary}",
+                evidence=", ".join(island.devices[:MAX_REPORTED_NODES]),
+                remediation=(
+                    "Add a resistive or source path to ground. A capacitor and an ideal "
+                    "current source do not provide one."
+                ),
+                metadata={"nodes": list(island.nodes), "devices": list(island.devices)},
+            )
+        )
+
+    for loop in voltage_source_loops(elements):
+        findings.append(
+            _finding(
+                context,
+                "SOLVE003",
+                "Ideal voltage source loop",
+                Severity.DENY,
+                f"{len(loop.devices)} ideal voltage source(s) form a loop",
+                evidence=" -> ".join(loop.nodes),
+                remediation=("Break the loop, or give one source an explicit series impedance."),
+                metadata={"sources": list(loop.devices), "nodes": list(loop.nodes)},
+            )
+        )
+    return findings
+
+
 def run_checks(context: CheckContext) -> tuple[Finding, ...]:
     """Run every built-in check and return a stable, de-duplicated sequence."""
 
@@ -740,6 +812,7 @@ def run_checks(context: CheckContext) -> tuple[Finding, ...]:
         _connectivity_findings,
         _source_conflicts,
         _rail_short_findings,
+        _solvability_findings,
     ):
         findings.extend(rule(context))
     unique = {finding.finding_id: finding for finding in findings}

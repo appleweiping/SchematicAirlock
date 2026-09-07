@@ -118,7 +118,9 @@ SchematicAirlock reports findings in these families:
 - missing declared ports, apparently undriven outputs, dangling internal nets,
   and floating MOS gates;
 - conflicting parallel ideal voltage sources, excessive source voltage, and
-  zero-ohm connections between configured power and ground rails.
+  zero-ohm connections between configured power and ground rails;
+- nodes with no DC path to ground, loops of ideal voltage sources, and decks
+  that reference no ground net at all.
 - hierarchy-aware rail/source checks, bounded parameter expressions, and
   explicit review of dynamic source waveforms whose levels cannot be bounded.
 
@@ -126,6 +128,59 @@ Every check is conservative. A review finding identifies an ambiguity that
 needs engineering judgment. A deny finding identifies a violated artifact
 contract or a high-confidence unsafe condition. Policy can override the
 severity of a specific finding code.
+
+### Operating points a simulator would refuse
+
+An artifact can parse cleanly, describe a plausible circuit, and still make the
+first DC solve fail with a singular matrix. Those are exactly the runs a
+pre-simulation boundary exists to save, so three findings cover the conditions
+that produce most of them:
+
+| code | condition | severity |
+|---|---|---|
+| `SOLVE001` | no element connects to any configured ground net | review |
+| `SOLVE002` | nodes with no conducting path to ground | deny |
+| `SOLVE003` | a loop made only of ideal voltage sources | deny |
+
+`SOLVE002` is the classic floating node. A charge amplifier whose summing node
+reaches the rest of the circuit only through capacitors has no DC reference,
+and a simulator will say so after the run has started:
+
+```
+- [DENY] SOLVE002 bundle: 1 node(s) have no conducting path to ground: sum
+```
+
+`SOLVE003` generalizes `SOLVE001`'s parallel case. Two ideal sources across one
+node pair is the same defect as three around a triangle, and the finding names
+every source in the loop rather than the one that closed it, because the
+closing edge alone is not something an engineer can act on.
+
+`SOLVE001` fires once for a whole deck rather than once per node. A deck that
+never mentions ground is a fragment or a naming mismatch, which is one problem
+however many nodes it strands. A subcircuit library that is never called
+expands to nothing and raises none of these.
+
+#### What counts as a DC path
+
+This is a convention, and it is stated rather than implied. Resistors,
+inductors, voltage sources, diodes and controlled voltage sources tie their
+nodes together. Capacitors do not, which is the point of the check, and neither
+do ideal current sources: forcing a current through a node says nothing about
+its potential, which is why a simulator refuses one that has no other path. A
+MOS gate is insulated and every other transistor terminal conducts through the
+channel or a junction; a bipolar base conducts, because it is a junction.
+
+A subcircuit call that could not be expanded is treated as connecting all of
+its pins. Nothing here can see inside it, and that is the assumption which
+cannot produce a false accusation: it may hide a defect inside an unresolvable
+subcircuit, and it will never refuse an artifact because part of it was
+unreadable. The same rule covers any element kind the parser does not
+recognize.
+
+Neither check consults a device model, so neither knows whether a transistor is
+biased on. Both describe topology, which is the level at which a simulator
+refuses the matrix in the first place.
+
 
 ## Policy
 
