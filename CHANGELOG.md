@@ -4,6 +4,8 @@ All notable changes are recorded here. Versions follow semantic versioning.
 
 ## Unreleased
 
+## 0.3.0 - 2026-09-07
+
 ### Added
 
 - `SOLVE002`: nodes with no conducting path to ground, the condition behind the most common
