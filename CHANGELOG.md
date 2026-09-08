@@ -2,7 +2,41 @@
 
 All notable changes are recorded here. Versions follow semantic versioning.
 
-## Unreleased
+## 0.4.0 - 2026-09-07
+
+### Added
+
+- Offline Magic DRC, KLayout DRC, Netgen LVS, and Magic PEX report adapters with bounded,
+  fail-closed parsing profiles and a common versioned finding shape.
+- Content-bound schematic, layout, PEX, report, input, and output lineage with a cross-view
+  completeness gate and deterministic SHA-256 records.
+- Exact, expiring, one-to-one waivers with visible applied, expired, and unused dispositions.
+- `verification-check` CLI, stable Python API, Draft 2020-12 manifest/report schemas, original
+  synthetic fixtures, threat-model documentation, and verification workload counters.
+- Checkout-independent report identity (`root` is the logical `.`), so identical bundles in
+  different workspaces serialize identically.
+
+### Security
+
+- Verification manifests reject duplicate or aliased paths, traversal and symlink escapes,
+  duplicate identifiers, non-finite/out-of-range coordinates, contradictory tool results,
+  ambiguous waiver matches, and fixed resource-limit overruns without running external tools.
+- Portable paths require NFC Unicode; hidden XML mixed/nested content and total finding counts
+  beyond the report schema ceiling are rejected instead of being silently ignored.
+- Public report-adapter inputs enforce the same two-MiB byte ceiling as bundle reports and reject
+  non-scalar Unicode before XML parsing, hashing, or serialization.
+- Public report adapters reject non-text values and Unicode controls or directional separators,
+  and enforce the character lower bound before allocating an encoded copy.
+- Waivers are bound to the exact finding fingerprint, including tool version, message, location,
+  bounding box, and objects; a changed diagnostic cannot silently inherit an older waiver.
+- Audit and verification reports use atomic no-clobber file output; replacement requires explicit
+  `--force`, while an output that aliases any audited input remains forbidden even when forced.
+- Release assets include a pinned-tool SPDX 2.3 SBOM and verified SHA-256 checksums alongside
+  GitHub build provenance attestations.
+- Pull requests enforce author-matching DCO trailers, and release workflows cryptographically
+  verify signed tags against the repository's auditable allowed-signers policy.
+- Verification waivers bind the full 256-bit finding fingerprint rather than a truncated display
+  hash, so adversarial collisions cannot transfer a reviewed waiver to a different finding.
 
 ## 0.3.0 - 2026-09-07
 

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<report-database>
+  <description>Synthetic clean DRC database</description>
+  <original-file>design.gds</original-file>
+  <generator>KLayout synthetic profile</generator>
+  <top-cell>demo_core</top-cell>
+  <tags />
+  <categories>
+    <category><name>M2.MIN_WIDTH</name><description>Synthetic width rule</description></category>
+  </categories>
+  <cells><cell><name>demo_core</name><layout-name>demo_core</layout-name></cell></cells>
+  <items />
+</report-database>

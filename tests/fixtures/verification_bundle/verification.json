@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "assessment_date": "2026-09-07",
+  "artifacts": [
+    {"id": "schematic", "kind": "schematic", "path": "design.sp"},
+    {"id": "layout", "kind": "layout", "path": "design.gds"},
+    {"id": "pex", "kind": "pex", "path": "design.pex.sp"}
+  ],
+  "reports": [
+    {
+      "id": "magic_drc",
+      "adapter": "magic-drc",
+      "path": "reports/magic.drc",
+      "tool": {"name": "Magic", "version": "8.3.489"},
+      "inputs": ["layout"],
+      "outputs": []
+    },
+    {
+      "id": "klayout_drc",
+      "adapter": "klayout-drc",
+      "path": "reports/klayout.lyrdb",
+      "tool": {"name": "KLayout", "version": "0.29.12"},
+      "inputs": ["layout"],
+      "outputs": []
+    },
+    {
+      "id": "netgen_lvs",
+      "adapter": "netgen-lvs",
+      "path": "reports/netgen.lvs",
+      "tool": {"name": "Netgen", "version": "1.5.290"},
+      "inputs": ["schematic", "layout"],
+      "outputs": []
+    },
+    {
+      "id": "magic_pex",
+      "adapter": "magic-pex",
+      "path": "reports/magic.pex",
+      "tool": {"name": "Magic", "version": "8.3.489"},
+      "inputs": ["layout"],
+      "outputs": ["pex"]
+    }
+  ],
+  "waivers": [
+    {
+      "id": "demo_spacing_reviewed",
+      "finding_id": "M1.MIN_SPACE-a36e8f186f1be849956a878fe984efd43f3fb603ca2923ca8365c5e2b0467c62",
+      "tool": "Magic",
+      "rule": "M1.MIN_SPACE",
+      "source": "reports/magic.drc",
+      "line": 3,
+      "objects": ["M1", "net_out"],
+      "expires": "2099-12-31",
+      "reason": "Synthetic fixture demonstrates a narrow, expiring waiver."
+    }
+  ]
+}

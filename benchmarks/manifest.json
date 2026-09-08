@@ -10,13 +10,35 @@
       {"path": "corpus/portable_analog/two_stage_ota.sp", "sha256": "c7d33fdc42b9cb66c5c9b0fc74c3dc4a8cb06e2c038912f1a5eca69268ea51fc"}
     ]
   },
+  "verification_fixture": {
+    "name": "verification_bundle",
+    "provenance": "Clean-room synthetic artifacts and bounded report profiles authored for this repository; no EDA report, PDK rule deck, foundry data, or third-party layout was copied.",
+    "license": "MIT",
+    "files": [
+      {"path": "tests/fixtures/verification_bundle/design.gds", "sha256": "390d957d1553a679c6d87750db0ab9be9066bf457d11e9c65bf9f20b8da02907"},
+      {"path": "tests/fixtures/verification_bundle/design.pex.sp", "sha256": "3234c186e142b104456be57780a7099a4840e679da8154d1a50f73e1f1b1a743"},
+      {"path": "tests/fixtures/verification_bundle/design.sp", "sha256": "951ddd526519d2b8b248a5d61a80c5b30969de9f22c5e92930a03d4675a4f311"},
+      {"path": "tests/fixtures/verification_bundle/reports/klayout.lyrdb", "sha256": "61ea65c465684881ef5d9520c82378f78ffa4afed097438976eb44d85080e76e"},
+      {"path": "tests/fixtures/verification_bundle/reports/magic.drc", "sha256": "f3bee88ffba3b508610aca510fe96a02f7f2c4c976f66ad3fa107d8604712ad6"},
+      {"path": "tests/fixtures/verification_bundle/reports/magic.pex", "sha256": "c53756de042e08bd0490ad2ea86419181225483b0d58dd2986a0f7f0c04cd373"},
+      {"path": "tests/fixtures/verification_bundle/reports/netgen.lvs", "sha256": "a6d113d775b0d987d48ee310990ef4ada43d56531eec2f4fc5a8f1c19960d79e"},
+      {"path": "tests/fixtures/verification_bundle/verification.json", "sha256": "d0ad10e723432532217b12dc0b444ba521a08afff516078c48b84257944cca4a"}
+    ]
+  },
   "runtime": {
-    "distribution_version": "0.3.0",
-    "package_tree_sha256": "287d59f29a919d0b7afd33253e20c8b7920938d83ac68828f3b6966ac89494ad",
-    "harness_sha256": "87c2f63edbcead13f7fc73b4bf0407e446f3c11a28b671afbf84cef6e2347ca5"
+    "distribution_version": "0.4.0",
+    "package_tree_sha256": "04078858f02c453af4591e302ce42fd15580b6feae3b7ba87aec61f0151d2906",
+    "harness_sha256": "2c384895d489fbf9df6afbf8a0b51e9a482dc714f2b41caa51065cd878e0efbb"
   },
   "command": "python benchmarks/benchmark.py --iterations 25",
-  "expected": {"decks_per_iteration": 2, "devices_per_iteration": 23, "findings_per_iteration": 9},
+  "expected": {
+    "decks_per_iteration": 2,
+    "devices_per_iteration": 23,
+    "findings_per_iteration": 9,
+    "verification_lineage_records_per_iteration": 4,
+    "verification_findings_per_iteration": 1
+  },
   "workload_sha256": "18d346fa7e641cd78b094985ec156e9b407253cd622c0c7d929b7285bd0e9cde",
+  "verification_workload_sha256": "fdd7bafc1ae8e74634d74d1ab5589e4f2972c064410830c3dc8ffc4ad2581b40",
   "timing_policy": "Informational only; compare on the same host, interpreter, and power mode."
 }

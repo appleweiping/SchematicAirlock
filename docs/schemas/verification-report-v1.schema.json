@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:schematic-airlock:verification-report:1",
+  "title": "SchematicAirlock physical-verification lineage report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "tool", "decision", "root", "assessment_date", "evaluated_as_of",
+    "manifest_sha256", "artifacts", "lineage", "findings", "waivers"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "tool": {
+      "allOf": [
+        {"$ref": "#/$defs/tool"},
+        {"properties": {"name": {"const": "SchematicAirlock"}}}
+      ]
+    },
+    "decision": {"enum": ["allow", "review", "deny"]},
+    "root": {"const": "."},
+    "assessment_date": {"type": "string", "format": "date"},
+    "evaluated_as_of": {"type": "string", "format": "date"},
+    "manifest_sha256": {"$ref": "#/$defs/digest"},
+    "artifacts": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "lineage": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "adapter", "tool", "report", "inputs", "outputs"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "adapter": {
+            "enum": ["magic-drc", "klayout-drc", "netgen-lvs", "magic-pex"]
+          },
+          "tool": {"$ref": "#/$defs/tool"},
+          "report": {"$ref": "#/$defs/digest-record"},
+          "inputs": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {"$ref": "#/$defs/artifact"}
+          },
+          "outputs": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {"$ref": "#/$defs/artifact"}
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 20000,
+      "items": {"$ref": "#/$defs/finding"}
+    },
+    "waivers": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "expires", "finding_id", "reason"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "status": {"enum": ["applied", "expired", "unused"]},
+          "expires": {"type": "string", "format": "date"},
+          "finding_id": {
+            "oneOf": [
+              {"$ref": "#/$defs/finding-id"},
+              {"type": "null"}
+            ]
+          },
+          "reason": {"$ref": "#/$defs/safe-text-512"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"},
+    "finding-id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}-[0-9a-f]{64}$"
+    },
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*[\\\\<>:\"|?*\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF])(?!.*(?:^|/)[^/]*[. ](?:/|$))(?!.*(?:^|/)(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.[^/]*)?(?:/|$)).+$"
+    },
+    "safe-text-128": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF]).+$"
+    },
+    "safe-text-512": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF]).+$"
+    },
+    "safe-text-2048": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF]).+$"
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 32, "pattern": "^[A-Za-z][A-Za-z0-9_.-]*$"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.+:-]*$"}
+      }
+    },
+    "digest-record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "size", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "path", "size", "sha256"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["schematic", "layout", "pex", "support"]},
+        "path": {"$ref": "#/$defs/path"},
+        "size": {"type": "integer", "minimum": 0},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "location": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["path", "line", "column", "bbox_um"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "line": {"type": "integer", "minimum": 1, "maximum": 20000},
+        "column": {"type": "integer", "minimum": 1},
+        "bbox_um": {
+          "type": ["array", "null"],
+          "prefixItems": [
+            {"type": "number"}, {"type": "number"},
+            {"type": "number"}, {"type": "number"}
+          ],
+          "minItems": 4,
+          "maxItems": 4
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "severity", "rule", "message", "source", "tool",
+        "location", "objects", "waived_by"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/finding-id"},
+        "severity": {"enum": ["info", "review", "deny"]},
+        "rule": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"},
+        "message": {"$ref": "#/$defs/safe-text-2048"},
+        "source": {"$ref": "#/$defs/path"},
+        "tool": {"$ref": "#/$defs/tool"},
+        "location": {"$ref": "#/$defs/location"},
+        "objects": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/safe-text-128"}
+        },
+        "waived_by": {"type": ["string", "null"], "minLength": 1}
+      }
+    }
+  }
+}

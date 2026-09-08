@@ -11,12 +11,16 @@ from pathlib import Path
 from time import perf_counter
 
 import schematic_airlock
-from schematic_airlock import audit_path
+from schematic_airlock import audit_path, verify_path
 
 ROOT = Path(__file__).parents[1]
 CORPUS = ROOT / "corpus" / "portable_analog"
 DECKS = tuple(sorted(CORPUS.glob("*.sp")))
 WORKLOAD_FILES = tuple(sorted((*CORPUS.glob("*.sp"), *CORPUS.glob("*.lib"))))
+VERIFICATION_BUNDLE = ROOT / "tests" / "fixtures" / "verification_bundle"
+VERIFICATION_FILES = tuple(
+    sorted(path for path in VERIFICATION_BUNDLE.rglob("*") if path.is_file())
+)
 
 
 def _package_tree_sha256() -> str:
@@ -51,6 +55,15 @@ def run(iterations: int) -> dict[str, object]:
         digest.update(relative)
         digest.update(len(content).to_bytes(8, "big"))
         digest.update(content)
+    verification_digest = sha256()
+    for path in VERIFICATION_FILES:
+        relative = path.relative_to(VERIFICATION_BUNDLE).as_posix().encode()
+        content = path.read_bytes()
+        verification_digest.update(len(relative).to_bytes(8, "big"))
+        verification_digest.update(relative)
+        verification_digest.update(len(content).to_bytes(8, "big"))
+        verification_digest.update(content)
+    lineage_records = verification_findings = 0
     for _ in range(iterations):
         started = perf_counter()
         current_devices = current_findings = 0
@@ -58,6 +71,9 @@ def run(iterations: int) -> dict[str, object]:
             report = audit_path(path)
             current_devices += report.stats.devices
             current_findings += len(report.findings)
+        verification = verify_path(VERIFICATION_BUNDLE)
+        lineage_records = len(verification.lineage)
+        verification_findings = len(verification.findings)
         samples.append((perf_counter() - started) * 1000)
         devices, findings = current_devices, current_findings
     return {
@@ -67,10 +83,13 @@ def run(iterations: int) -> dict[str, object]:
         "package_tree_sha256": _package_tree_sha256(),
         "harness_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
         "workload_sha256": digest.hexdigest(),
+        "verification_workload_sha256": verification_digest.hexdigest(),
         "iterations": iterations,
         "decks_per_iteration": len(DECKS),
         "devices_per_iteration": devices,
         "findings_per_iteration": findings,
+        "verification_lineage_records_per_iteration": lineage_records,
+        "verification_findings_per_iteration": verification_findings,
         "median_ms": round(statistics.median(samples), 6),
         "minimum_ms": round(min(samples), 6),
     }

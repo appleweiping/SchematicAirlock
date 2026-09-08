@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -295,6 +296,109 @@ def test_cli_writes_report_and_explains_it(tmp_path: Path) -> None:
     explanation = io.StringIO()
     assert main(["explain", str(destination), finding_id], stdout=explanation) == EXIT_OK
     assert "EXEC001" in explanation.getvalue()
+
+
+def test_audit_output_is_atomic_no_clobber_and_never_an_input_alias(tmp_path: Path) -> None:
+    source = tmp_path / "deny.sp"
+    original = b".control\n"
+    source.write_bytes(original)
+
+    for force in ([], ["--force"]):
+        errors = io.StringIO()
+        assert (
+            main(
+                ["audit", str(source), "--format", "json", "--output", str(source), *force],
+                stderr=errors,
+            )
+            == EXIT_INPUT
+        )
+        assert "aliases an input" in errors.getvalue()
+        assert source.read_bytes() == original
+
+    destination = tmp_path / "report.json"
+    destination.write_text("sentinel", encoding="utf-8")
+    errors = io.StringIO()
+    assert (
+        main(
+            ["audit", str(source), "--format", "json", "--output", str(destination)],
+            stderr=errors,
+        )
+        == EXIT_INPUT
+    )
+    assert "refusing to overwrite" in errors.getvalue()
+    assert destination.read_text(encoding="utf-8") == "sentinel"
+    assert (
+        main(
+            [
+                "audit",
+                str(source),
+                "--format",
+                "json",
+                "--output",
+                str(destination),
+                "--force",
+            ]
+        )
+        == EXIT_GATE
+    )
+    assert json.loads(destination.read_text(encoding="utf-8"))["decision"] == "deny"
+    assert not list(tmp_path.glob(".*.tmp"))
+
+    hardlink = tmp_path / "source-alias.sp"
+    os.link(source, hardlink)
+    errors = io.StringIO()
+    assert (
+        main(
+            [
+                "audit",
+                str(source),
+                "--format",
+                "json",
+                "--output",
+                str(hardlink),
+                "--force",
+            ],
+            stderr=errors,
+        )
+        == EXIT_INPUT
+    )
+    assert "aliases an input" in errors.getvalue()
+    assert source.read_bytes() == original
+
+
+def test_audit_force_failure_keeps_old_output_and_cleans_staging(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import schematic_airlock._output as output_module
+
+    source = tmp_path / "source.sp"
+    source.write_text(".control\n", encoding="utf-8")
+    destination = tmp_path / "report.json"
+    destination.write_bytes(b"reviewed-report")
+
+    def fail_replace(source_path: str | Path, destination_path: str | Path) -> None:
+        raise OSError("injected replace failure")
+
+    monkeypatch.setattr(output_module.os, "replace", fail_replace)
+    errors = io.StringIO()
+    assert (
+        main(
+            [
+                "audit",
+                str(source),
+                "--format",
+                "json",
+                "--output",
+                str(destination),
+                "--force",
+            ],
+            stderr=errors,
+        )
+        == EXIT_INPUT
+    )
+    assert "injected replace failure" in errors.getvalue()
+    assert destination.read_bytes() == b"reviewed-report"
+    assert not list(tmp_path.glob(".*.tmp"))
 
 
 def test_cli_explain_rejects_oversized_report_without_traceback(tmp_path: Path) -> None:
