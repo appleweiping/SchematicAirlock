@@ -2,6 +2,20 @@
 
 All notable changes are recorded here. Versions follow semantic versioning.
 
+## 0.4.1 - 2026-09-08
+
+### Fixed
+
+- Release SBOMs now scan the isolated environment containing the installed wheel with a pinned
+  Syft version, and offline validation requires the exact package version plus document-to-package
+  and package-to-file SPDX relationships.
+- Release handoffs now admit exactly the wheel, source distribution, SPDX SBOM, and checksum
+  manifest, and re-verify the asset allowlist and every checksum after each download.
+- Bind every installed RECORD entry (including the console launcher) to checked wheel content
+  and SPDX checksums. Reject noncanonical package locators and unsafe distribution members.
+- Manual release rehearsals require a signed version tag and successful main-push CI;
+  distribution auditing runs in the frozen package environment.
+
 ## 0.4.0 - 2026-09-07
 
 ### Added

@@ -26,8 +26,8 @@
     ]
   },
   "runtime": {
-    "distribution_version": "0.4.0",
-    "package_tree_sha256": "04078858f02c453af4591e302ce42fd15580b6feae3b7ba87aec61f0151d2906",
+    "distribution_version": "0.4.1",
+    "package_tree_sha256": "e6c1d14bf731a71585e3aa2f9611f88fc5d35250fdc37be9480c9ba75f6b0fdc",
     "harness_sha256": "2c384895d489fbf9df6afbf8a0b51e9a482dc714f2b41caa51065cd878e0efbb"
   },
   "command": "python benchmarks/benchmark.py --iterations 25",
