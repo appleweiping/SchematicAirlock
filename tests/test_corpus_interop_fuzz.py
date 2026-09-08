@@ -236,6 +236,14 @@ def test_benchmark_manifest_binds_every_corpus_file() -> None:
     assert recorded == expected
     for record in manifest["corpus"]["files"]:
         assert sha256((ROOT / record["path"]).read_bytes()).hexdigest() == record["sha256"]
+    verification_root = ROOT / "tests" / "fixtures" / "verification_bundle"
+    verification_records = manifest["verification_fixture"]["files"]
+    recorded_verification = {ROOT / record["path"] for record in verification_records}
+    assert recorded_verification == {
+        path for path in verification_root.rglob("*") if path.is_file()
+    }
+    for record in verification_records:
+        assert sha256((ROOT / record["path"]).read_bytes()).hexdigest() == record["sha256"]
 
 
 def test_runtime_benchmark_hashes_decks_and_followed_libraries() -> None:
@@ -255,9 +263,23 @@ def test_runtime_benchmark_hashes_decks_and_followed_libraries() -> None:
         expected.update(relative)
         expected.update(len(content).to_bytes(8, "big"))
         expected.update(content)
+    expected_verification = sha256()
+    verification_root = ROOT / "tests" / "fixtures" / "verification_bundle"
+    for path in sorted(item for item in verification_root.rglob("*") if item.is_file()):
+        relative = path.relative_to(verification_root).as_posix().encode()
+        content = path.read_bytes()
+        expected_verification.update(len(relative).to_bytes(8, "big"))
+        expected_verification.update(relative)
+        expected_verification.update(len(content).to_bytes(8, "big"))
+        expected_verification.update(content)
     result = benchmark_run(1)
     manifest = json.loads((ROOT / "benchmarks" / "manifest.json").read_text(encoding="utf-8"))
     assert result["workload_sha256"] == expected.hexdigest() == manifest["workload_sha256"]
+    assert (
+        result["verification_workload_sha256"]
+        == expected_verification.hexdigest()
+        == manifest["verification_workload_sha256"]
+    )
     assert result["distribution_version"] == version("schematic-airlock")
     assert result["package_tree_sha256"] == _imported_tree_sha256()
     assert (

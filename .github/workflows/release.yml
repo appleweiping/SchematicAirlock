@@ -29,7 +29,18 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Verify tag commit is reachable from main
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          git config gpg.format ssh
+          git config gpg.ssh.allowedSignersFile "$GITHUB_WORKSPACE/.github/allowed_signers"
+          git verify-tag "$GITHUB_REF_NAME"
+          commit_verified="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.commit.verification.verified')"
+          commit_reason="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.commit.verification.reason')"
+          if [ "$commit_verified" != "true" ]; then
+            echo "release commit signature is not verified (reason: $commit_reason)" >&2
+            exit 1
+          fi
           git fetch --no-tags origin main
           git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
             echo "release commit is not reachable from origin/main" >&2
@@ -130,12 +141,22 @@ jobs:
               "docs/schemas/audit-report-v1.schema.json",
               "docs/schemas/bundle-manifest-v1.schema.json",
               "docs/schemas/structural-summary-v1.schema.json",
+              "docs/schemas/verification-manifest-v1.schema.json",
+              "docs/schemas/verification-report-v1.schema.json",
           }
           if missing := required_source - source_names:
               raise SystemExit(f"source distribution is missing: {sorted(missing)}")
           with zipfile.ZipFile(wheels[0]) as archive:
               wheel_names = set(archive.namelist())
-          required_wheel = {"schematic_airlock/_version.py", "schematic_airlock/py.typed"}
+          required_wheel = {
+              "schematic_airlock/_version.py",
+              "schematic_airlock/py.typed",
+              "schematic_airlock/schemas/audit-report-v1.schema.json",
+              "schematic_airlock/schemas/bundle-manifest-v1.schema.json",
+              "schematic_airlock/schemas/structural-summary-v1.schema.json",
+              "schematic_airlock/schemas/verification-manifest-v1.schema.json",
+              "schematic_airlock/schemas/verification-report-v1.schema.json",
+          }
           if missing := required_wheel - wheel_names:
               raise SystemExit(f"wheel is missing: {sorted(missing)}")
           PY
@@ -145,6 +166,8 @@ jobs:
           .release-smoke/bin/python -m pip install --disable-pip-version-check --no-deps dist/*.whl
           .release-smoke/bin/python -I - <<'PY'
           import subprocess
+          import json
+          from importlib.resources import files
           from importlib.metadata import version
 
           import schematic_airlock
@@ -160,8 +183,40 @@ jobs:
           )
           if completed.stdout.strip() != f"schematic-airlock {expected}":
               raise SystemExit("CLI version does not match distribution metadata")
+          schema = files("schematic_airlock").joinpath(
+              "schemas/verification-report-v1.schema.json"
+          ).read_text(encoding="utf-8")
+          if json.loads(schema)["$schema"] != "https://json-schema.org/draft/2020-12/schema":
+              raise SystemExit("installed verification schema has the wrong dialect")
+          verified = subprocess.run(
+              [
+                  ".release-smoke/bin/schematic-airlock",
+                  "verification-check",
+                  "tests/fixtures/verification_bundle",
+                  "--format",
+                  "json",
+              ],
+              check=True,
+              capture_output=True,
+              text=True,
+          )
+          if json.loads(verified.stdout)["decision"] != "allow":
+              raise SystemExit("installed verification CLI smoke did not allow clean evidence")
           PY
-      - name: Upload verified distributions
+      - name: Generate SPDX software bill of materials
+        uses: anchore/sbom-action@3ad7283483fc7af8ff2b4ea19663c2d5ca935e26 # v0.24.2
+        with:
+          path: dist
+          format: spdx-json
+          output-file: dist/SBOM.spdx.json
+          upload-artifact: false
+      - name: Generate and verify release checksums
+        run: |
+          cd dist
+          sha256sum -- ./*.whl ./*.tar.gz ./SBOM.spdx.json > SHA256SUMS
+          sha256sum --check SHA256SUMS
+          python -c 'import json; assert json.load(open("SBOM.spdx.json"))["spdxVersion"] == "SPDX-2.3"'
+      - name: Upload verified distributions and release evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-distributions

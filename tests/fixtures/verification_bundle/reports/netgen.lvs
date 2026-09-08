@@ -1,0 +1,4 @@
+Circuit 1: demo_core schematic
+Circuit 2: demo_core extracted layout
+Result: Circuits match uniquely.
+LVS Done

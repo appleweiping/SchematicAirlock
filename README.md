@@ -76,6 +76,35 @@ Exit codes are stable:
 | 2 | Audit completed and the gate threshold was reached |
 | 3 | The input, policy, report, or filesystem operation was invalid |
 
+## Offline DRC, LVS, and PEX lineage
+
+SchematicAirlock can also gate physical-verification evidence that another workflow has already
+produced. It does not run Magic, KLayout, Netgen, a simulator, or any subprocess. A strict
+`verification.json` binds schematic, layout, and extracted views to Magic DRC, KLayout DRC,
+Netgen LVS, and Magic PEX reports; the output records the observed SHA-256 of every report and
+every lineage input/output.
+
+```console
+schematic-airlock verification-check tests/fixtures/verification_bundle
+schematic-airlock verification-check artifact/verification.json --format json --pretty
+```
+
+Report files are no-clobber by default. `--force` permits an intentional replacement, but an
+output path can never alias an audited netlist, policy, verification manifest, artifact, or tool
+report. File output is installed atomically after the complete gate succeeds.
+
+The completeness gate requires layout DRC, schematic-to-layout LVS, and layout-to-PEX evidence.
+Findings use one versioned shape: `severity`, `rule`, `message`, `source`, `tool`, `location`, and
+`objects`. Exact waivers retain the original finding, expire against the manifest's explicit
+assessment date, and cannot waive missing lineage. Duplicate IDs or paths, path traversal,
+symlink escapes, non-finite coordinates, oversized input, contradictory terminal results, and
+ambiguous waiver matches are rejected.
+
+See [the physical-verification lineage contract](docs/verification-lineage.md), the
+[manifest schema](docs/schemas/verification-manifest-v1.schema.json), and the
+[report schema](docs/schemas/verification-report-v1.schema.json). The included reports and
+artifacts are original synthetic fixtures, not copied EDA output or foundry decks.
+
 ## Bundle contract
 
 A bundle is either one netlist file or a directory. A directory may contain a
@@ -266,6 +295,16 @@ assert memory_report.bundle_sha256
 
 All public result objects are immutable dataclasses. `AuditReport.as_dict()`
 returns the versioned JSON representation.
+
+Physical-verification reports use a separate stable API and report type:
+
+```python
+from schematic_airlock import verification_report_json, verify_path
+
+verification = verify_path("artifact/verification.json")
+print(verification.decision)
+print(verification_report_json(verification, pretty=True))
+```
 
 ## Security boundary and limitations
 

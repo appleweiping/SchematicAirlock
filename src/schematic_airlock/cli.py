@@ -9,6 +9,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Never, TextIO
 
+from schematic_airlock._output import write_report
 from schematic_airlock._version import __version__
 from schematic_airlock.domain import AirlockError, Decision
 from schematic_airlock.engine import audit_path
@@ -16,6 +17,11 @@ from schematic_airlock.fuzzing import fuzz_smoke
 from schematic_airlock.interop import compare_structural_summary, load_structural_summary_path
 from schematic_airlock.policy import AuditPolicy
 from schematic_airlock.report import explain_finding, load_report_path, report_json, report_text
+from schematic_airlock.verification import (
+    verification_report_json,
+    verification_report_text,
+    verify_path,
+)
 
 EXIT_OK = 0
 EXIT_GATE = 2
@@ -42,6 +48,7 @@ def _parser() -> argparse.ArgumentParser:
     audit.add_argument("--format", choices=("text", "json"), default="text")
     audit.add_argument("--pretty", action="store_true", help="indent JSON output")
     audit.add_argument("--output", help="write report to this file")
+    audit.add_argument("--force", action="store_true", help="replace an existing output")
     audit.add_argument(
         "--fail-on",
         choices=("review", "deny"),
@@ -77,15 +84,36 @@ def _parser() -> argparse.ArgumentParser:
         default="review",
         help="minimum fresh-audit decision that produces exit code 2",
     )
+    verification = subcommands.add_parser(
+        "verification-check",
+        help="check bounded DRC/LVS/PEX reports and their artifact lineage",
+    )
+    verification.add_argument("path", help="verification.json or a directory containing it")
+    verification.add_argument("--format", choices=("text", "json"), default="text")
+    verification.add_argument("--pretty", action="store_true", help="indent JSON output")
+    verification.add_argument("--output", help="write report to this file")
+    verification.add_argument("--force", action="store_true", help="replace an existing output")
+    verification.add_argument(
+        "--fail-on",
+        choices=("review", "deny"),
+        default="review",
+        help="minimum decision that produces exit code 2",
+    )
     return parser
 
 
-def _write_output(text: str, destination: str | None, stdout: TextIO) -> None:
+def _write_output(
+    text: str,
+    destination: str | None,
+    stdout: TextIO,
+    *,
+    protected: tuple[Path, ...],
+    force: bool,
+) -> None:
     if destination is None:
         stdout.write(text)
         return
-    path = Path(destination)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    write_report(destination, text, protected=protected, force=force)
 
 
 def _audit(args: argparse.Namespace, stdout: TextIO) -> int:
@@ -94,7 +122,40 @@ def _audit(args: argparse.Namespace, stdout: TextIO) -> int:
         rendered = report_json(report, pretty=args.pretty)
     else:
         rendered = report_text(report)
-    _write_output(rendered, args.output, stdout)
+    root = Path(report.root)
+    protected = tuple(root / item.path for item in report.files)
+    if args.policy:
+        protected += (Path(args.policy),)
+    _write_output(
+        rendered,
+        args.output,
+        stdout,
+        protected=protected,
+        force=args.force,
+    )
+    threshold = Decision.REVIEW if args.fail_on == "review" else Decision.DENY
+    return EXIT_GATE if report.decision.rank >= threshold.rank else EXIT_OK
+
+
+def _verification(args: argparse.Namespace, stdout: TextIO) -> int:
+    report = verify_path(args.path)
+    if args.format == "json":
+        rendered = verification_report_json(report, pretty=args.pretty)
+    else:
+        rendered = verification_report_text(report)
+    source = Path(args.path)
+    root = source.resolve(strict=True) if source.is_dir() else source.parent.resolve(strict=True)
+    manifest = root / "verification.json" if source.is_dir() else source
+    protected = [manifest]
+    protected.extend(root / item.digest.path for item in report.artifacts)
+    protected.extend(root / item.report.path for item in report.lineage)
+    _write_output(
+        rendered,
+        args.output,
+        stdout,
+        protected=tuple(protected),
+        force=args.force,
+    )
     threshold = Decision.REVIEW if args.fail_on == "review" else Decision.DENY
     return EXIT_GATE if report.decision.rank >= threshold.rank else EXIT_OK
 
@@ -143,6 +204,8 @@ def main(
             output.write(f"structural summary verified; audit decision: {report.decision.value}\n")
             threshold = Decision.REVIEW if args.fail_on == "review" else Decision.DENY
             return EXIT_GATE if report.decision.rank >= threshold.rank else EXIT_OK
+        if args.command == "verification-check":
+            return _verification(args, output)
     except (AirlockError, OSError, UnicodeError, ValueError) as exc:
         errors.write(f"schematic-airlock: {exc}\n")
         return EXIT_INPUT

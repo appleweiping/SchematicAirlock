@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:schematic-airlock:verification-manifest:1",
+  "title": "SchematicAirlock verification manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "assessment_date", "artifacts", "reports", "waivers"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "assessment_date": {"type": "string", "format": "date"},
+    "artifacts": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "path"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "kind": {"enum": ["schematic", "layout", "pex", "support"]},
+          "path": {"$ref": "#/$defs/path"}
+        }
+      }
+    },
+    "reports": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "adapter", "path", "tool", "inputs", "outputs"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "adapter": {
+            "enum": ["magic-drc", "klayout-drc", "netgen-lvs", "magic-pex"]
+          },
+          "path": {"$ref": "#/$defs/path"},
+          "tool": {"$ref": "#/$defs/tool"},
+          "inputs": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/id"}
+          },
+          "outputs": {
+            "type": "array",
+            "maxItems": 64,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/id"}
+          }
+        }
+      }
+    },
+    "waivers": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "finding_id", "tool", "rule", "source", "line", "objects", "expires", "reason"
+        ],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"},
+          "finding_id": {
+            "type": "string",
+            "maxLength": 193,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}-[0-9a-f]{64}$"
+          },
+          "tool": {"enum": ["Magic", "KLayout", "Netgen"]},
+          "rule": {"$ref": "#/$defs/rule"},
+          "source": {"$ref": "#/$defs/path"},
+          "line": {"type": ["integer", "null"], "minimum": 1, "maximum": 20000},
+          "objects": {
+            "type": "array",
+            "maxItems": 32,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/safe-text-128"}
+          },
+          "expires": {"type": "string", "format": "date"},
+          "reason": {"$ref": "#/$defs/safe-text-512"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,63}$"
+    },
+    "rule": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,127}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?![A-Za-z]:)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*[\\\\<>:\"|?*\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF])(?!.*(?:^|/)[^/]*[. ](?:/|$))(?!.*(?:^|/)(?:[Cc][Oo][Nn]|[Pp][Rr][Nn]|[Aa][Uu][Xx]|[Nn][Uu][Ll]|[Cc][Oo][Mm][1-9]|[Ll][Pp][Tt][1-9])(?:\\.[^/]*)?(?:/|$)).+$"
+    },
+    "safe-text-128": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF]).+$"
+    },
+    "safe-text-512": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!.*[\\u0000-\\u001F\\u007F-\\u009F\\u00AD\\u061C\\u180E\\u200B-\\u200F\\u2028-\\u202E\\u2060-\\u206F\\uFEFF]).+$"
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"enum": ["Magic", "KLayout", "Netgen"]},
+        "version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.+:-]{0,63}$"
+        }
+      }
+    }
+  }
+}

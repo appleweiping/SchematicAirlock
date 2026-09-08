@@ -11,7 +11,7 @@ from schematic_airlock.cli import main
 def test_runtime_distribution_cli_and_report_versions_agree(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    assert __version__ == version("schematic-airlock") == "0.3.0"
+    assert __version__ == version("schematic-airlock") == "0.4.0"
     with pytest.raises(SystemExit) as raised:
         main(["--version"])
     assert raised.value.code == 0

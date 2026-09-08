@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "schematic-airlock"
-version = "0.3.0"
+version = "0.4.0"
 description = "Deterministic offline safety checks for generated SPICE artifacts"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -51,6 +51,13 @@ exclude = ["/.github", "/uv.lock"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/schematic_airlock"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"docs/schemas/audit-report-v1.schema.json" = "schematic_airlock/schemas/audit-report-v1.schema.json"
+"docs/schemas/bundle-manifest-v1.schema.json" = "schematic_airlock/schemas/bundle-manifest-v1.schema.json"
+"docs/schemas/structural-summary-v1.schema.json" = "schematic_airlock/schemas/structural-summary-v1.schema.json"
+"docs/schemas/verification-manifest-v1.schema.json" = "schematic_airlock/schemas/verification-manifest-v1.schema.json"
+"docs/schemas/verification-report-v1.schema.json" = "schematic_airlock/schemas/verification-report-v1.schema.json"
 
 [tool.pytest.ini_options]
 addopts = [
