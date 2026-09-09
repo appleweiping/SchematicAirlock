@@ -38,7 +38,8 @@ from schematic_airlock.voltage_rules import (
 )
 
 _LITERAL = re.compile(
-    r"([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,3})?)([a-z]*)", re.IGNORECASE
+    r"([+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]{1,3})?)([a-z]*)",
+    re.IGNORECASE | re.ASCII,
 )
 _PREFIX = {"t": 12, "g": 9, "meg": 6, "k": 3, "m": -3, "u": -6, "n": -9, "p": -12, "f": -15}
 

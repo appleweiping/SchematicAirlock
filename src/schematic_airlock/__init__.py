@@ -1,6 +1,13 @@
 """Public API for SchematicAirlock."""
 
 from schematic_airlock._version import __version__
+from schematic_airlock.dc_netlist import (
+    DCNetlistReport,
+    dc_report_json,
+    dc_report_text,
+    solve_dc_path,
+    solve_dc_text,
+)
 from schematic_airlock.domain import AuditReport, Decision, Finding, Severity
 from schematic_airlock.engine import audit_path, audit_text
 from schematic_airlock.fuzzing import FuzzStats, fuzz_smoke
@@ -8,6 +15,16 @@ from schematic_airlock.interop import (
     StructuralSummary,
     compare_structural_summary,
     load_structural_summary,
+)
+from schematic_airlock.linear_dc import (
+    DCBranch,
+    DCBudgetExceeded,
+    DCInputError,
+    DCLimits,
+    DCSolution,
+    InconsistentDC,
+    SingularDC,
+    solve_linear_dc,
 )
 from schematic_airlock.policy import AuditPolicy
 from schematic_airlock.verification import (
@@ -58,14 +75,22 @@ from schematic_airlock.voltage_rules import (
 __all__ = [
     "AuditPolicy",
     "AuditReport",
+    "DCBranch",
+    "DCBudgetExceeded",
+    "DCInputError",
+    "DCLimits",
+    "DCNetlistReport",
+    "DCSolution",
     "Decision",
     "DigestRecord",
     "ExpectedVoltage",
     "Finding",
     "FuzzStats",
+    "InconsistentDC",
     "InconsistentVoltages",
     "ModelVoltageRating",
     "Severity",
+    "SingularDC",
     "StructuralSummary",
     "ToolIdentity",
     "VerificationAdapter",
@@ -90,6 +115,8 @@ __all__ = [
     "check_voltages_path",
     "check_voltages_text",
     "compare_structural_summary",
+    "dc_report_json",
+    "dc_report_text",
     "fuzz_smoke",
     "load_structural_summary",
     "load_voltage_rules",
@@ -98,6 +125,9 @@ __all__ = [
     "parse_magic_pex",
     "parse_netgen_lvs",
     "parse_voltage_rules",
+    "solve_dc_path",
+    "solve_dc_text",
+    "solve_linear_dc",
     "verification_report_json",
     "verification_report_text",
     "verify_path",

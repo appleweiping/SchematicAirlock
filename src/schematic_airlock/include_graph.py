@@ -92,6 +92,12 @@ def load_include_graph(
                     relative,
                 )
             )
+            # Repeated expansion is already an unsupported result. The first
+            # visit fully traversed this deck, so descending again can only
+            # duplicate evidence and can expand a small include DAG
+            # exponentially. Active-path cycles are detected by the caller
+            # before reaching this repeat guard.
+            return
         active.append(relative)
         flow: list[Directive | IncludeRef] = [
             directive for directive in deck.directives if directive.name == "param"

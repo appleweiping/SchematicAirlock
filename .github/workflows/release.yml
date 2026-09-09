@@ -15,7 +15,7 @@ permissions:
 
 env:
   RELEASE_PROJECT_NAME: schematic-airlock
-  RELEASE_PROJECT_VERSION: "0.5.0"
+  RELEASE_PROJECT_VERSION: "0.6.0"
   RELEASE_SYFT_VERSION: "1.51.1"
 
 jobs:
@@ -105,7 +105,7 @@ jobs:
           RELEASE_TAG: ${{ github.ref_name }}
           EXPECTED_VERSION: ${{ env.RELEASE_PROJECT_VERSION }}
         run: |
-          python - <<'PY'
+          python -I -S - <<'PY'
           import os
           import tomllib
           from pathlib import Path
@@ -132,7 +132,7 @@ jobs:
       - name: Validate distribution metadata and shape
         run: |
           uv run --frozen python -m twine check --strict dist/*
-          uv run --frozen python - <<'PY'
+          uv run --frozen python -I - <<'PY'
           import tarfile
           import zipfile
           import os
@@ -158,6 +158,7 @@ jobs:
               "CITATION.cff",
               "benchmarks/manifest.json",
               "benchmarks/voltage_constraints.py",
+              "benchmarks/linear_dc_ngspice.py",
               "corpus/portable_analog/primitives.lib",
               "corpus/portable_analog/rc_sensor_frontend.sp",
               "corpus/portable_analog/two_stage_ota.sp",
@@ -169,6 +170,11 @@ jobs:
               "docs/schemas/voltage-rules-v1.schema.json",
               "docs/schemas/voltage-report-v1.schema.json",
               "docs/voltage-envelopes.md",
+              "docs/linear-dc.md",
+              "docs/linear-dc-dense-oracle-audit.md",
+              "docs/linear-dc-integration-audit.md",
+              "docs/schemas/linear-dc-report-v1.schema.json",
+              "examples/linear_dc/divider.sp",
               "examples/voltage_envelope/design.sp",
               "examples/voltage_envelope/rules.json",
               "src/schematic_airlock/dco.py",
@@ -177,6 +183,9 @@ jobs:
               "src/schematic_airlock/voltage.py",
               "src/schematic_airlock/voltage_constraints.py",
               "src/schematic_airlock/voltage_rules.py",
+              "src/schematic_airlock/linear_dc.py",
+              "src/schematic_airlock/dc_netlist.py",
+              "tests/test_linear_dc_dense_oracle.py",
           }
           if missing := required_source - source_names:
               raise SystemExit(f"source distribution is missing: {sorted(missing)}")
@@ -198,6 +207,9 @@ jobs:
               "schematic_airlock/voltage.py",
               "schematic_airlock/voltage_constraints.py",
               "schematic_airlock/voltage_rules.py",
+              "schematic_airlock/linear_dc.py",
+              "schematic_airlock/dc_netlist.py",
+              "schematic_airlock/schemas/linear-dc-report-v1.schema.json",
           }
           if missing := required_wheel - wheel_names:
               raise SystemExit(f"wheel is missing: {sorted(missing)}")
@@ -254,7 +266,7 @@ jobs:
           )
           if json.loads(verified.stdout)["decision"] != "allow":
               raise SystemExit("installed verification CLI smoke did not allow clean evidence")
-          for name in ("voltage-rules-v1", "voltage-report-v1"):
+          for name in ("voltage-rules-v1", "voltage-report-v1", "linear-dc-report-v1"):
               schema = json.loads(files("schematic_airlock").joinpath(
                   f"schemas/{name}.schema.json"
               ).read_text(encoding="utf-8"))
@@ -282,6 +294,37 @@ jobs:
               or report["tool_version"] != expected
           ):
               raise SystemExit("installed voltage CLI did not reproduce the body-diode oracle")
+          linear = subprocess.run(
+              [
+                  ".release-smoke/bin/schematic-airlock",
+                  "linear-dc", "examples/linear_dc/divider.sp", "--format", "json",
+              ],
+              check=True, capture_output=True, text=True,
+          )
+          result = json.loads(linear.stdout)
+          currents = {item["label"]: item["current_amperes"] for item in result["branches"]}
+          if (
+              linear.stderr or result["status"] != "solved"
+              or result["nodes"] != {"0": "0", "out": "3", "rail": "5"}
+              or currents != {"top/r1": "1/1000", "top/r2": "1/1000", "top/v1": "-1/1000"}
+              or result["tool_version"] != expected
+          ):
+              raise SystemExit("installed linear DC CLI did not reproduce the exact divider")
+          unsupported = subprocess.run(
+              [
+                  ".release-smoke/bin/schematic-airlock",
+                  "linear-dc", "examples/voltage_envelope/design.sp", "--format", "json",
+              ],
+              check=False, capture_output=True, text=True,
+          )
+          rejected = json.loads(unsupported.stdout)
+          if (
+              unsupported.returncode != 2 or unsupported.stderr
+              or rejected["status"] != "unsupported" or rejected["nodes"]
+              or rejected["branches"] or rejected["network_id"] is not None
+              or rejected["work"] is not None
+          ):
+              raise SystemExit("installed linear DC CLI fabricated values for transistor semantics")
           PY
           site_packages="$(.release-smoke/bin/python -I -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
           installation_root="$(realpath .release-smoke)"
@@ -312,7 +355,7 @@ jobs:
           upload-release-assets: false
       - name: Validate the installed-wheel SBOM and release checksums
         run: |
-          uv run --frozen python -m schematic_airlock.release_artifacts bind-installed-wheel \
+          uv run --frozen python -I -m schematic_airlock.release_artifacts bind-installed-wheel \
             --sbom dist/SBOM.spdx.json \
             --site-packages "$RELEASE_SITE_PACKAGES" \
             --installation-root "$RELEASE_INSTALLATION_ROOT" \
@@ -320,16 +363,16 @@ jobs:
             --wheel "dist/schematic_airlock-$RELEASE_PROJECT_VERSION-py3-none-any.whl" \
             --name "$RELEASE_PROJECT_NAME" \
             --version "$RELEASE_PROJECT_VERSION"
-          uv run --frozen python -m schematic_airlock.release_artifacts validate-sbom \
+          uv run --frozen python -I -m schematic_airlock.release_artifacts validate-sbom \
             --sbom dist/SBOM.spdx.json \
             --name "$RELEASE_PROJECT_NAME" \
             --version "$RELEASE_PROJECT_VERSION" \
             --syft-version "$RELEASE_SYFT_VERSION"
-          uv run --frozen python -m schematic_airlock.release_artifacts write-checksums \
+          uv run --frozen python -I -m schematic_airlock.release_artifacts write-checksums \
             --directory dist \
             --name "$RELEASE_PROJECT_NAME" \
             --version "$RELEASE_PROJECT_VERSION"
-          uv run --frozen python -m schematic_airlock.release_artifacts verify-release \
+          uv run --frozen python -I -m schematic_airlock.release_artifacts verify-release \
             --directory dist \
             --name "$RELEASE_PROJECT_NAME" \
             --version "$RELEASE_PROJECT_VERSION" \
@@ -368,7 +411,7 @@ jobs:
           path: dist
       - name: Re-verify downloaded release assets
         run: >-
-          python -I src/schematic_airlock/release_artifacts.py verify-release
+          python -I -S src/schematic_airlock/release_artifacts.py verify-release
           --directory dist
           --name "$RELEASE_PROJECT_NAME"
           --version "$RELEASE_PROJECT_VERSION"
@@ -400,7 +443,7 @@ jobs:
           path: dist
       - name: Re-verify downloaded release assets
         run: >-
-          python -I src/schematic_airlock/release_artifacts.py verify-release
+          python -I -S src/schematic_airlock/release_artifacts.py verify-release
           --directory dist
           --name "$RELEASE_PROJECT_NAME"
           --version "$RELEASE_PROJECT_VERSION"

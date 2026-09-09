@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:org.schematic-airlock:linear-dc-report:1",
+  "title": "SchematicAirlock closed linear R/V/I DC report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "profile", "tool_version", "status", "entry", "bundle_sha256", "files", "network_id", "nodes", "branches", "notes", "work"],
+  "properties": {
+    "schema": {"const": "org.schematic-airlock.linear-dc-report"},
+    "version": {"const": 1},
+    "profile": {"const": "linear-rvi-v1"},
+    "tool_version": {"type": "string", "minLength": 1, "maxLength": 128},
+    "status": {"enum": ["solved", "inconsistent", "singular", "unsupported", "budget-exceeded"]},
+    "entry": {"type": "string", "minLength": 1, "maxLength": 1024},
+    "bundle_sha256": {"$ref": "#/$defs/sha256"},
+    "files": {
+      "type": "array", "maxItems": 128,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "size", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "size": {"type": "integer", "minimum": 0, "maximum": 2000000},
+          "sha256": {"$ref": "#/$defs/sha256"}
+        }
+      }
+    },
+    "network_id": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "nodes": {
+      "type": "object", "maxProperties": 2000000,
+      "propertyNames": {"type": "string", "minLength": 1, "maxLength": 1024},
+      "additionalProperties": {"$ref": "#/$defs/fraction"}
+    },
+    "branches": {
+      "type": "array", "maxItems": 100000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["label", "current_amperes", "absorbed_watts", "location"],
+        "properties": {
+          "label": {"type": "string", "minLength": 1, "maxLength": 1024},
+          "current_amperes": {"$ref": "#/$defs/fraction"},
+          "absorbed_watts": {"$ref": "#/$defs/fraction"},
+          "location": {
+            "type": "object", "additionalProperties": false,
+            "required": ["path", "line", "column"],
+            "properties": {
+              "path": {"type": "string", "minLength": 1, "maxLength": 1024},
+              "line": {"type": "integer", "minimum": 1},
+              "column": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
+    "notes": {"type": "array", "maxItems": 1, "items": {"type": "string"}},
+    "work": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["unknowns", "operations", "peak_nonzeros"],
+          "properties": {
+            "unknowns": {"type": "integer", "minimum": 0, "maximum": 3000000},
+            "operations": {"type": "integer", "minimum": 0, "maximum": 100000000},
+            "peak_nonzeros": {"type": "integer", "minimum": 0, "maximum": 10000000}
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "solved"}}},
+      "then": {"properties": {"network_id": {"type": "string"}, "nodes": {"minProperties": 1}, "branches": {"minItems": 1}, "notes": {"maxItems": 0}, "work": {"type": "object"}}},
+      "else": {"properties": {"network_id": {"type": "null"}, "nodes": {"maxProperties": 0}, "branches": {"maxItems": 0}, "notes": {"minItems": 1}, "work": {"type": "null"}}}
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "fraction": {"type": "string", "maxLength": 2469, "pattern": "^(0|-?[1-9][0-9]*)(/[1-9][0-9]*)?$"}
+  }
+}

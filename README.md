@@ -91,7 +91,16 @@ The example deliberately exposes a possible PMOS body-diode violation under its
 independent envelopes; it is not a foundry-certified inverter. See
 [voltage assumptions, bounds, algorithms and limitations](docs/voltage-envelopes.md).
 
+## Exact linear DC operating points
+
+For a literal resistor and independent DC-source network, `linear-dc` computes
+exact node voltages, branch currents and absorbed power, independently checks
+physical residuals and distinguishes inconsistent, singular and unassessed
+inputs. See the [linear DC contract](docs/linear-dc.md). This remains separate
+from artifact acceptance and nonlinear voltage-rating checks.
+
 ## Offline DRC, LVS, and PEX lineage
+
 
 SchematicAirlock can also gate physical-verification evidence that another workflow has already
 produced. It does not run Magic, KLayout, Netgen, a simulator, or any subprocess. A strict
