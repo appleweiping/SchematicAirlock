@@ -88,6 +88,16 @@ def _parameters(tokens: Iterable[str]) -> tuple[tuple[str, str], ...]:
     return tuple(result)
 
 
+def _explicit_parameters(line: LogicalLine, tokens: list[str]) -> tuple[tuple[str, str], ...]:
+    if any("=" not in token for token in tokens):
+        raise SyntaxFailure(
+            "every token after params: must be a name=value assignment",
+            line.location,
+            line.evidence,
+        )
+    return _parameters(tokens)
+
+
 def _positional(tokens: Iterable[str]) -> list[str]:
     return [token for token in tokens if "=" not in token]
 
@@ -150,7 +160,11 @@ def _element(line: LogicalLine, values: list[str]) -> Element:
         _require(line, [name, *instance_tokens], 3, "subcircuit instance")
         nodes = tuple(instance_tokens[:-1])
         model = instance_tokens[-1]
-        params = _parameters(raw_tail[marker + 1 :] if marker < len(raw_tail) else raw_tail)
+        params = (
+            _explicit_parameters(line, raw_tail[marker + 1 :])
+            if marker < len(raw_tail)
+            else _parameters(raw_tail)
+        )
     elif kind in {"E", "G"}:
         _require(line, positional, 6, f"{kind} controlled source")
         nodes = tuple(positional[1:5])
@@ -221,7 +235,11 @@ def parse_deck(text: str, path: str) -> Deck:
             current = _SubcircuitBuilder(
                 name=positional[0],
                 ports=tuple(positional[1:]),
-                parameters=_parameters(tail[marker + 1 :] if marker < len(tail) else tail[1:]),
+                parameters=(
+                    _explicit_parameters(line, tail[marker + 1 :])
+                    if marker < len(tail)
+                    else _parameters(tail[1:])
+                ),
                 location=line.location,
             )
             continue

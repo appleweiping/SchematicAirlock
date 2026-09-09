@@ -2,6 +2,32 @@
 
 All notable changes are recorded here. Versions follow semantic versioning.
 
+## 0.7.0 - 2026-09-09
+
+### Added
+
+- Composite declared DC rail-short paths with bounded shortest-path witnesses,
+  exact zero-value intent, and conservative exclusions for opaque/dynamic devices.
+- Original strict electrical-rule corpus covering every current electrical rule
+  family, primitive inventory, and voltage-envelope outcome with explicit oracles.
+- Guarded end-to-end hierarchy scaling with observed materialization counts and
+  OS peak-memory measurements; reproducible real ngspice rail/parameter probes.
+
+### Fixed
+
+- Isolate numeric parsing, evaluation and display from the caller's Decimal
+  context; reject underflow, out-of-range values, malformed numeric delimiters
+  and inexact arithmetic in the electrical-proof profile.
+- Resolve final top-level and per-instance parameter declarations, preserving
+  instance/body/header/global precedence and reevaluating derived values.
+  Cycles, invalid overrides and exhausted work budgets cannot reuse stale values.
+- Reject malformed explicit parameter tails and preserve earlier malformed
+  declaration findings even if a later override supplies a valid value.
+- Check parameter-dependent voltage and passive values from reached final
+  bindings; preserve literal artifact diagnostics for dormant definitions.
+- Prevent opaque R/L/V modifiers and reconfigured SPICE ground from supporting
+  false short-intent proofs. R=0 is not claimed to be exact simulator resistance.
+
 ## 0.6.0 - 2026-09-09
 
 ### Added

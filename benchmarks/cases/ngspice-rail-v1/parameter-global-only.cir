@@ -1,0 +1,10 @@
+Parameter precedence oracle: global only
+.param a=1
+IIN 0 n DC 1
+X1 n 0 cell
+.subckt cell p n
+RPATH p n {a}
+.ends cell
+.op
+.print op v(n)
+.end

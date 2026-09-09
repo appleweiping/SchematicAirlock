@@ -156,16 +156,54 @@ def test_interop_cli_verifies_the_shared_contract(tmp_path: Path) -> None:
     summary.write_text(json.dumps(_summary()), encoding="utf-8")
     output = io.StringIO()
     assert (
-        main(["interop-check", str(CORPUS / "two_stage_ota.sp"), str(summary)], stdout=output) == 2
+        main(["interop-check", str(CORPUS / "two_stage_ota.sp"), str(summary)], stdout=output) == 0
     )
-    assert output.getvalue() == "structural summary verified; audit decision: review\n"
+    assert output.getvalue() == "structural summary verified; audit decision: allow\n"
+
+
+def test_interop_cli_preserves_review_threshold_and_severity_override(tmp_path: Path) -> None:
+    # The portable OTA's parameters now resolve correctly. Use a genuinely
+    # unknown value, not that old false-positive fixture, to test review policy.
+    deck = tmp_path / "unknown.sp"
+    payload = b"RUNKNOWN vdd 0 {missing}\n"
+    deck.write_bytes(payload)
+    summary = tmp_path / "summary.json"
+    summary.write_text(
+        json.dumps(
+            {
+                "schema": "org.spice-tools.structural-summary",
+                "schema_version": 1,
+                # Synthetic test fixture for the supported SpiceTrellis wire contract.
+                "producer": {"name": "SpiceTrellis", "version": "test-fixture"},
+                "files": [
+                    {
+                        "path": deck.name,
+                        "bytes": len(payload),
+                        "sha256": sha256(payload).hexdigest(),
+                    }
+                ],
+                "structure": {
+                    "files": 1,
+                    "includes": 0,
+                    "subcircuits": 0,
+                    "element_families": {"R": 1},
+                    "parameters": [],
+                    "models": [],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    output = io.StringIO()
+    assert main(["interop-check", str(deck), str(summary)], stdout=output) == 2
+    assert output.getvalue().endswith("audit decision: review\n")
 
     permissive = io.StringIO()
     assert (
         main(
             [
                 "interop-check",
-                str(CORPUS / "two_stage_ota.sp"),
+                str(deck),
                 str(summary),
                 "--fail-on",
                 "deny",
@@ -185,7 +223,7 @@ def test_interop_cli_verifies_the_shared_contract(tmp_path: Path) -> None:
         main(
             [
                 "interop-check",
-                str(CORPUS / "two_stage_ota.sp"),
+                str(deck),
                 str(summary),
                 "--policy",
                 str(policy),

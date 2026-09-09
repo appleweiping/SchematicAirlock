@@ -1,0 +1,6 @@
+RAIL oracle: LTspice-style inductor series resistance is not ngspice syntax
+IIN 0 n DC 1
+LPATH n 0 1u Rser=1
+.op
+.print op v(n)
+.end

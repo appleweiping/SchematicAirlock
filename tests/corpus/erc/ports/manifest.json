@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "entry": "missing_output.sp",
+  "description": "Top-level output intent used by the ERC regression corpus.",
+  "intended_ports": {
+    "out": "output"
+  }
+}

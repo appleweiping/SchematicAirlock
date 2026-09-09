@@ -1,0 +1,6 @@
+RAIL oracle: literal zero resistor
+IIN 0 n DC 1
+RPATH n 0 0
+.op
+.print op v(n)
+.end

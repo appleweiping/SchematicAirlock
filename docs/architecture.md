@@ -38,9 +38,12 @@ The bundle stores each successfully read file exactly once, preventing include
 fan-out from multiplying byte accounting. Depth remains a property of each
 active traversal path, so the parse cache cannot hide a deeper reference.
 Top-level parameter directives are also recorded as a depth-first textual
-event stream. Includes expand at their statement location rather than in
-filename order. A repeated include replays its parameter events but emits an
-explicit review finding because repeated definitions may be simulator-specific.
+event stream. Unique includes expand at their statement location rather than
+in filename order. A repeated include emits `INCL003` and is not traversed
+again: repeating a small include DAG must not expand evidence exponentially.
+Its parameter events are not replayed and simulator-specific repeat semantics
+are not claimed. The exact-DC and voltage-envelope adapters reject that include
+issue instead of publishing a successful electrical result from partial events.
 
 ### Language confinement
 

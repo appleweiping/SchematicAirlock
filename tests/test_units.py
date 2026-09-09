@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_UP, Decimal, Inexact, localcontext
 
 import pytest
 
@@ -151,3 +151,61 @@ def test_number_parser_does_not_execute_python(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setattr("builtins.eval", fail)
     assert evaluate_expression("2 * (3 + 4)") == Decimal("14")
     assert called is False
+
+
+def test_numeric_contract_is_independent_of_the_callers_decimal_context() -> None:
+    value = Decimal("1.23456789012345678901234567890123456789")
+    with localcontext() as context:
+        context.prec, context.Emin, context.Emax = 2, -2, 2
+        context.rounding = ROUND_UP
+        context.traps[Inexact] = True
+        assert parse_number("1e-100") == Decimal("1e-100")
+        assert parse_number("1e100") == Decimal("1e100")
+        assert parse_number("1.23456789012345678901234567890123456789") == value
+        assert decimal_text(value) == "1.23456789012345678901234567890123456789"
+        assert evaluate_expression("1e-50*1e-50", exact=True) == Decimal("1e-100")
+
+
+@pytest.mark.parametrize("literal", ["1e-101", "1e-9999999", "1e9999999", "1" * 1025])
+def test_out_of_range_numbers_never_round_or_underflow_to_zero(literal: str) -> None:
+    with pytest.raises(ValueError):
+        parse_number(literal)
+
+
+def test_exact_proof_expressions_never_round_cancellation_into_zero() -> None:
+    assert evaluate_expression("1e60 + 1 - 1e60", exact=True) == Decimal(1)
+    with pytest.raises(ValueError):
+        evaluate_expression("1/3", exact=True)
+    assert Decimal("0.3333") < evaluate_expression("1/3") < Decimal("0.3334")
+
+
+def test_exact_parameter_propagation_preserves_small_difference() -> None:
+    values = parameter_assignments(["a=1e60+1", "b=a-1e60"], exact=True)
+    assert values["b"] == Decimal(1)
+
+
+@pytest.mark.parametrize("value", [Decimal("NaN"), Decimal("Infinity"), Decimal("1e-9999999")])
+def test_formatting_cannot_expand_unbounded_or_nonfinite_values(value: Decimal) -> None:
+    with pytest.raises(ValueError):
+        decimal_text(value)
+
+
+def test_parameter_count_checks_the_new_key_before_insertion() -> None:
+    boundary = {f"p{index}": Decimal(1) for index in range(128)}
+    assert len(parameter_assignments(["P0=2"], boundary, exact=True)) == 128
+    with pytest.raises(ValueError, match="128"):
+        parameter_assignments(["overflow=1"], boundary, exact=True)
+    with pytest.raises(ValueError, match="128"):
+        parameter_assignments([f"p{index}=1" for index in range(129)], exact=True)
+
+
+@pytest.mark.parametrize("tokens", ["a=1", [None], ["x" * 18000]])
+def test_parameter_assignment_container_has_a_bounded_typed_contract(tokens) -> None:
+    with pytest.raises(ValueError):
+        parameter_assignments(tokens)
+
+
+@pytest.mark.parametrize("literal", ["{{0}}", "{0", "0}", "'0", "0'", "{0'"])
+def test_numeric_quotes_and_braces_must_be_one_matching_pair(literal: str) -> None:
+    with pytest.raises(ValueError):
+        parse_number(literal)

@@ -143,7 +143,7 @@ class AuditPolicy:
             self.electrical.max_abs_source_voltage <= 0
         ):
             raise PolicyError("max_abs_source_voltage must be positive and finite")
-        ground = {item.lower() for item in self.electrical.ground_nets}
+        ground = {item.lower() for item in self.electrical.ground_nets} | {"0"}
         power = {item.lower() for item in self.electrical.power_nets}
         if ground & power:
             raise PolicyError("ground_nets and power_nets must not overlap")

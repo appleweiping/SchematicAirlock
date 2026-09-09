@@ -15,7 +15,7 @@ permissions:
 
 env:
   RELEASE_PROJECT_NAME: schematic-airlock
-  RELEASE_PROJECT_VERSION: "0.6.0"
+  RELEASE_PROJECT_VERSION: "0.7.0"
   RELEASE_SYFT_VERSION: "1.51.1"
 
 jobs:
@@ -159,6 +159,22 @@ jobs:
               "benchmarks/manifest.json",
               "benchmarks/voltage_constraints.py",
               "benchmarks/linear_dc_ngspice.py",
+              "benchmarks/hierarchy_scale.py",
+              "benchmarks/ngspice_rail_oracle.py",
+              "benchmarks/results/erc-v070-regression-20260909.json",
+              "benchmarks/results/hierarchy-scale-windows-20260909-v070-depth6.json",
+              "benchmarks/results/ngspice-42-windows-rail-oracle-20260909-v2.json",
+              "tests/corpus/erc/manifest.json",
+              "tests/test_erc_corpus.py",
+              "tests/test_hierarchy_scale.py",
+              "tests/test_ngspice_rail_oracle.py",
+              "tests/test_parameter_proofs.py",
+              "tests/test_rail_short_paths.py",
+              "tests/test_units_oracle.py",
+              "tests/test_version.py",
+              "docs/erc-regression-corpus.md",
+              "docs/hierarchy-scaling.md",
+              "docs/ngspice-rail-oracle.md",
               "corpus/portable_analog/primitives.lib",
               "corpus/portable_analog/rc_sensor_frontend.sp",
               "corpus/portable_analog/two_stage_ota.sp",
@@ -235,6 +251,23 @@ jobs:
           from importlib.metadata import version
 
           import schematic_airlock
+
+          rail = schematic_airlock.audit_text("R1 vdd bridge 0\nR2 bridge 0 0\n")
+          if rail.decision.value != "deny" or [f.code for f in rail.findings] != ["RAIL002"]:
+              raise SystemExit("installed wheel did not detect the composite rail short")
+          scope = schematic_airlock.audit_text(
+              ".subckt cell p n params: a=0 b={a+1}\n"
+              ".param a=0\nR1 p n {b}\n.ends cell\nX1 vdd 0 cell params: a=4\n"
+          )
+          if scope.findings:
+              raise SystemExit("installed wheel did not resolve final instance parameter values")
+          for literal in ("1e-1000", "1e-10000", "{0"):
+              uncertain = schematic_airlock.audit_text(f"R1 vdd 0 {literal}\n")
+              if (
+                  uncertain.decision.value == "allow"
+                  or any(f.code in {"RAIL001", "RAIL002"} for f in uncertain.findings)
+              ):
+                  raise SystemExit("installed wheel silently converted invalid resistance to zero")
 
           expected = version("schematic-airlock")
           if schematic_airlock.__version__ != expected:

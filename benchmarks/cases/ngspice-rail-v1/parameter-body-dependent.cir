@@ -1,0 +1,10 @@
+Parameter precedence oracle: body dependency sees instance override
+IIN 0 n DC 1
+X1 n 0 cell a=4
+.subckt cell p n params: a=2
+.param b={a+1}
+RPATH p n {b}
+.ends cell
+.op
+.print op v(n)
+.end

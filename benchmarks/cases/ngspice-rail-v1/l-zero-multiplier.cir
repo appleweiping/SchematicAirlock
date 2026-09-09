@@ -1,0 +1,6 @@
+RAIL oracle: invalid zero inductor multiplier
+IIN 0 n DC 1
+LPATH n 0 1u m=0
+.op
+.print op v(n)
+.end
