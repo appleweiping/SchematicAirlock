@@ -2,6 +2,27 @@
 
 All notable changes are recorded here. Versions follow semantic versioning.
 
+## 0.5.0 - 2026-09-09
+
+### Added
+
+- Exact rational DC voltage-difference solver with weighted equality elimination,
+  negative-cycle detection, sparse pairwise bounds and cumulative work budgets.
+- Explicit net/source envelopes, expected-power ranges, six signed MOS terminal
+  ratings and diode forward/reverse voltage checks; unknown and partial results
+  never become passes. Versioned rules/report schemas, public API and CLI.
+- Independent all-pairs oracle tests, original illustrative model-rating example,
+  hierarchical/source-location evidence and Unicode display-control protection.
+- Trusted-base DCO verification binding PR base/head/count, rerunning on retarget
+  edits and resetting pending status before verification.
+
+### Fixed
+
+- Preserve parent-internal net identity when binding nested subcircuit ports.
+- Release evidence now checks the required SPDX 2.3 document-header profile
+  before binding or accepting installed-package files. This is a release-profile
+  check, not a general SPDX conformance validator.
+
 ## 0.4.1 - 2026-09-08
 
 ### Fixed

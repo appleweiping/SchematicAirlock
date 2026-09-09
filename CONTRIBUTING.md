@@ -33,5 +33,13 @@ Run the full quality suite before opening a pull request. Update the changelog
 and public documentation when user-visible behavior changes. Keep commits
 focused and make review possible without generated noise.
 
+Every commit must carry an author-matching `Signed-off-by` DCO trailer. Use
+`git commit -s` and retain each trailer when rebasing. The trusted-base DCO
+workflow reads PR metadata, never PR executable code, and checks base/head/count
+before/after download and before publishing its status. Retarget edits rerun
+the gate and reset `DCO / commits` to pending. The initial installation PR uses
+the existing CI DCO gate; its follow-up rollout removes that transitional job
+once the trusted status is available and required by protected main.
+
 By contributing, you agree that your contribution is licensed under the MIT
 License included in this repository.

@@ -13,17 +13,23 @@ import re
 import stat
 import zipfile
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from email.parser import Parser
 from pathlib import Path, PurePosixPath
 from tempfile import NamedTemporaryFile
 from typing import Any
+from urllib.parse import urlsplit
 
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _SHA1_DIGEST = re.compile(r"[0-9a-f]{40}\Z")
 _SAFE_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*\Z")
 _CHECKSUM_LINE = re.compile(r"([0-9a-f]{64})  ([A-Za-z0-9][A-Za-z0-9._+-]*)\Z")
 _SPDX_ID = re.compile(r"SPDXRef-[A-Za-z0-9.-]+\Z")
+_SPDX_CREATED = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\Z")
+_URI_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*\Z")
 _MAX_SBOM_BYTES = 64 * 1024 * 1024
+_MAX_JSON_DEPTH = 64
+_MAX_JSON_NODES = 250_000
 _DOCUMENT_ID = "SPDXRef-DOCUMENT"
 
 
@@ -83,11 +89,33 @@ def _reject_nonstandard_json_constant(value: str) -> None:
     raise ReleaseArtifactError(f"SBOM contains non-standard JSON constant {value!r}")
 
 
+def _validate_json_complexity(value: object) -> None:
+    pending = [(value, 0)]
+    enqueued = 1
+    while pending:
+        item, depth = pending.pop()
+        if depth > _MAX_JSON_DEPTH:
+            raise ReleaseArtifactError("SBOM JSON exceeds complexity limits")
+        children: object
+        if isinstance(item, Mapping):
+            children = item.values()
+        elif isinstance(item, list):
+            children = item
+        else:
+            continue
+        for child in children:
+            enqueued += 1
+            if enqueued > _MAX_JSON_NODES:
+                raise ReleaseArtifactError("SBOM JSON exceeds complexity limits")
+            pending.append((child, depth + 1))
+
+
 def load_spdx(path: Path) -> Mapping[str, Any]:
     """Load one bounded, duplicate-key-free SPDX JSON document."""
 
     try:
-        payload = path.read_bytes()
+        with path.open("rb") as stream:
+            payload = stream.read(_MAX_SBOM_BYTES + 1)
     except OSError as error:
         raise ReleaseArtifactError(f"cannot read SBOM {path}: {error}") from error
     if len(payload) > _MAX_SBOM_BYTES:
@@ -98,8 +126,11 @@ def load_spdx(path: Path) -> Mapping[str, Any]:
             object_pairs_hook=_object_without_duplicate_keys,
             parse_constant=_reject_nonstandard_json_constant,
         )
-    except (UnicodeError, json.JSONDecodeError) as error:
+    except ReleaseArtifactError:
+        raise
+    except (UnicodeError, RecursionError, OverflowError, ValueError) as error:
         raise ReleaseArtifactError(f"SBOM is not valid UTF-8 JSON: {error}") from error
+    _validate_json_complexity(value)
     if not isinstance(value, Mapping):
         raise ReleaseArtifactError("SBOM root must be an object")
     return value
@@ -109,6 +140,65 @@ def _objects(value: object, context: str) -> tuple[dict[str, Any], ...]:
     if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
         raise ReleaseArtifactError(f"SBOM {context} must be an array of objects")
     return tuple(value)
+
+
+def _safe_spdx_text(value: object, context: str) -> str:
+    if not isinstance(value, str) or not value or value != value.strip() or not value.isprintable():
+        raise ReleaseArtifactError(f"SBOM {context} must be safe non-empty text")
+    return value
+
+
+def _validate_document_header(
+    document: Mapping[str, Any], *, expected_syft_version: str | None = None
+) -> None:
+    """Validate the SPDX document-header profile required by release evidence."""
+
+    if document.get("spdxVersion") != "SPDX-2.3":
+        raise ReleaseArtifactError("SBOM spdxVersion must be SPDX-2.3")
+    if document.get("dataLicense") != "CC0-1.0":
+        raise ReleaseArtifactError("SBOM dataLicense must be CC0-1.0")
+    if document.get("SPDXID") != _DOCUMENT_ID:
+        raise ReleaseArtifactError(f"SBOM document SPDXID must be {_DOCUMENT_ID}")
+    _safe_spdx_text(document.get("name"), "name")
+
+    namespace = _safe_spdx_text(document.get("documentNamespace"), "documentNamespace")
+    try:
+        parsed_namespace = urlsplit(namespace)
+    except ValueError as error:
+        raise ReleaseArtifactError(
+            "SBOM documentNamespace must be an absolute URI without a fragment"
+        ) from error
+    if (
+        _URI_SCHEME.fullmatch(parsed_namespace.scheme) is None
+        or "#" in namespace
+        or any(character.isspace() for character in namespace)
+    ):
+        raise ReleaseArtifactError(
+            "SBOM documentNamespace must be an absolute URI without a fragment"
+        )
+
+    creation = document.get("creationInfo")
+    if not isinstance(creation, Mapping):
+        raise ReleaseArtifactError("SBOM creationInfo must be an object")
+    created = creation.get("created")
+    if not isinstance(created, str) or _SPDX_CREATED.fullmatch(created) is None:
+        raise ReleaseArtifactError("SBOM creationInfo created must be a valid UTC timestamp")
+    try:
+        datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as error:
+        raise ReleaseArtifactError(
+            "SBOM creationInfo created must be a valid UTC timestamp"
+        ) from error
+
+    creators = creation.get("creators")
+    if not isinstance(creators, list) or not creators:
+        raise ReleaseArtifactError("SBOM must identify a pinned generator in creationInfo creators")
+    for creator in creators:
+        _safe_spdx_text(creator, "creationInfo creator")
+    if expected_syft_version is not None:
+        expected_creator = f"Tool: syft-{expected_syft_version}"
+        if expected_creator not in creators:
+            raise ReleaseArtifactError(f"SBOM must identify pinned generator {expected_creator}")
 
 
 def _package_candidates(
@@ -560,8 +650,7 @@ def bind_installed_wheel(
     document = load_spdx(sbom_path)
     if not isinstance(document, dict):  # pragma: no cover - load_spdx returns a dict
         raise ReleaseArtifactError("SBOM root must be mutable")
-    if document.get("spdxVersion") != "SPDX-2.3" or document.get("SPDXID") != _DOCUMENT_ID:
-        raise ReleaseArtifactError("SBOM must be an SPDX-2.3 document before binding")
+    _validate_document_header(document)
     packages = _objects(document.get("packages"), "packages")
     files = _objects(document.get("files"), "files")
     element_ids = _spdx_element_ids(document.get("SPDXID"), packages, files)
@@ -702,20 +791,9 @@ def validate_spdx(
     expected_version: str,
     expected_syft_version: str,
 ) -> None:
-    """Require an SPDX 2.3 package with versioned document and file relationships."""
+    """Require the release SPDX 2.3 header and installed-package file profile."""
 
-    if document.get("spdxVersion") != "SPDX-2.3":
-        raise ReleaseArtifactError("SBOM spdxVersion must be SPDX-2.3")
-    if document.get("SPDXID") != _DOCUMENT_ID:
-        raise ReleaseArtifactError(f"SBOM document SPDXID must be {_DOCUMENT_ID}")
-
-    creation = document.get("creationInfo")
-    if not isinstance(creation, Mapping):
-        raise ReleaseArtifactError("SBOM creationInfo must be an object")
-    creators = creation.get("creators")
-    expected_creator = f"Tool: syft-{expected_syft_version}"
-    if not isinstance(creators, list) or expected_creator not in creators:
-        raise ReleaseArtifactError(f"SBOM must identify pinned generator {expected_creator}")
+    _validate_document_header(document, expected_syft_version=expected_syft_version)
 
     packages = _objects(document.get("packages"), "packages")
     files = _objects(document.get("files"), "files")

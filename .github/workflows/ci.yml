@@ -9,6 +9,8 @@ permissions:
   contents: read
 
 jobs:
+  # Transitional check for the PR installing the trusted-base DCO workflow.
+  # Remove this job in the rollout PR once DCO / commits is required on main.
   dco:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest

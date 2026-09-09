@@ -76,6 +76,21 @@ Exit codes are stable:
 | 2 | Audit completed and the gate threshold was reached |
 | 3 | The input, policy, report, or filesystem operation was invalid |
 
+## DC voltage-envelope checking
+
+`voltage-check` adds exact rational voltage-difference reasoning over literal DC
+sources, zero-ohm ties and explicit operating envelopes. It checks all six MOS
+terminal pairs and diode forward/reverse ranges using user-supplied model ratings,
+retaining `indeterminate`, `possible-violation` and contradictory-source outcomes.
+
+```console
+schematic-airlock voltage-check examples/voltage_envelope/design.sp --rules examples/voltage_envelope/rules.json
+```
+
+The example deliberately exposes a possible PMOS body-diode violation under its
+independent envelopes; it is not a foundry-certified inverter. See
+[voltage assumptions, bounds, algorithms and limitations](docs/voltage-envelopes.md).
+
 ## Offline DRC, LVS, and PEX lineage
 
 SchematicAirlock can also gate physical-verification evidence that another workflow has already

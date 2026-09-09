@@ -1,0 +1,36 @@
+{
+  "schema": "org.schematic-airlock.voltage-rules",
+  "version": 1,
+  "source_envelopes": {
+    "top/vrail": {"min": "1.62", "max": "1.98"},
+    "top/vinput": {"min": "0", "max": "1.98"}
+  },
+  "net_envelopes": {"output": {"min": "0", "max": "1.98"}},
+  "expected": [
+    {"name": "supply", "positive": "rail", "negative": "0", "min": "1.62", "max": "1.98"}
+  ],
+  "models": {
+    "nch": {
+      "kind": "M",
+      "limits": {
+        "gs": {"min": "-1.98", "max": "1.98"},
+        "gd": {"min": "-1.98", "max": "1.98"},
+        "gb": {"min": "-1.98", "max": "1.98"},
+        "ds": {"min": "0", "max": "1.98"},
+        "bs": {"min": "0", "max": "0"},
+        "bd": {"min": "-1.98", "max": "0.3"}
+      }
+    },
+    "pch": {
+      "kind": "M",
+      "limits": {
+        "gs": {"min": "-1.98", "max": "1.98"},
+        "gd": {"min": "-1.98", "max": "1.98"},
+        "gb": {"min": "-1.98", "max": "1.98"},
+        "ds": {"min": "-1.98", "max": "0.36"},
+        "bs": {"min": "0", "max": "0"},
+        "bd": {"min": "-0.3", "max": "1.98"}
+      }
+    }
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schematic-airlock.org/schemas/voltage-report-v1.schema.json",
+  "title": "DC voltage-envelope report, version 1",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "version", "tool_version", "mode", "status", "root", "entry", "bundle_sha256", "rules_sha256", "files", "checks", "notes", "assumptions", "constraints", "edge_visits"],
+  "properties": {
+    "schema": {"const": "org.schematic-airlock.voltage-report"}, "version": {"const": 1},
+    "tool_version": {"type": "string", "minLength": 1}, "mode": {"const": "dc-envelope"},
+    "status": {"enum": ["pass", "violation", "possible-violation", "indeterminate", "inconsistent"]},
+    "root": {"type": "string"}, "entry": {"type": "string", "minLength": 1},
+    "bundle_sha256": {"$ref": "#/$defs/hash"}, "rules_sha256": {"$ref": "#/$defs/hash"},
+    "files": {
+      "type": "array", "maxItems": 128,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["path", "size", "sha256"],
+        "properties": {"path": {"type": "string"}, "size": {"type": "integer", "minimum": 0}, "sha256": {"$ref": "#/$defs/hash"}}
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "positive", "negative", "observed", "allowed", "status", "location"],
+        "properties": {
+          "name": {"type": "string"}, "positive": {"type": "string"}, "negative": {"type": "string"},
+          "observed": {"$ref": "#/$defs/interval"}, "allowed": {"$ref": "#/$defs/interval"},
+          "status": {"enum": ["pass", "violation", "possible-violation", "indeterminate"]},
+          "location": {
+            "oneOf": [
+              {"type": "null"},
+              {"type": "object", "additionalProperties": false, "required": ["path", "line", "column"],
+                "properties": {"path": {"type": "string"}, "line": {"type": "integer", "minimum": 1}, "column": {"type": "integer", "minimum": 1}}}
+            ]
+          }
+        }
+      }
+    },
+    "notes": {"type": "array", "items": {"type": "string"}},
+    "assumptions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "constraints": {"type": "integer", "minimum": 0}, "edge_visits": {"type": "integer", "minimum": 0}
+  },
+  "$defs": {
+    "hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "rational": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^-?[0-9]+(?:/[1-9][0-9]*)?$"}]},
+    "interval": {
+      "type": "object", "additionalProperties": false, "required": ["lower_volts", "upper_volts"],
+      "properties": {"lower_volts": {"$ref": "#/$defs/rational"}, "upper_volts": {"$ref": "#/$defs/rational"}}
+    }
+  }
+}
