@@ -27,6 +27,9 @@ All notable changes are recorded here. Versions follow semantic versioning.
   bindings; preserve literal artifact diagnostics for dormant definitions.
 - Prevent opaque R/L/V modifiers and reconfigured SPICE ground from supporting
   false short-intent proofs. R=0 is not claimed to be exact simulator resistance.
+- Confirm actual worker exit within one bounded interval when Linux releases
+  its process-memory fields before publishing exit status. All accepted scale
+  results must still meet the final observed wall-time and memory limits.
 
 ## 0.6.0 - 2026-09-09
 

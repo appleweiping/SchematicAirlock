@@ -60,9 +60,29 @@ Limits may be lowered but cannot exceed 3 GiB or 180 seconds:
 uv run --frozen python -I benchmarks/hierarchy_scale.py --depth 5 --rss-limit-mib 2048 --timeout-seconds 120
 ```
 
-Failure to read the live worker's OS memory counter is also fatal. The hidden
-worker mode requires a per-run parent token so the documented interface cannot
-accidentally bypass monitoring. Benchmark output is one JSON document. It binds
+Failure to measure a live worker is fatal. One bounded exception handles Linux
+process teardown: after a previous positive OS sample, an unavailable memory
+counter permits one non-renewable exit-confirmation wait of at most 10 ms,
+clipped to the remaining wall-time budget. The monitor accepts this path only
+if the child actually exits before that deadline. An unmeasurable child that
+remains alive is terminated; a child with no positive sample never receives
+this grace. Malformed counter values and permission/read errors remain fatal.
+The wall deadline is checked before accepting either ordinary or confirmed
+exit and again after collecting the child's output. No successful report may
+contain an observed worker wall time at or above its configured timeout.
+Missing memory fields alone do not prove a zombie state: the kernel's
+[`proc_pid_status`](https://github.com/torvalds/linux/blob/v6.12/fs/proc/array.c#L416)
+emits memory fields only while an address space is available, and
+[`exit_mm`](https://github.com/torvalds/linux/blob/v6.12/kernel/exit.c#L510)
+releases it before the full exit path has finished.
+
+These guards are sampled process supervision, not kernel-enforced allocation
+limits or a sandbox: memory can change between polls, and scheduling can delay
+observation and termination. Reported peak RSS is the greatest OS high-water
+value observed by the monitor, not a guaranteed post-exit resource-accounting
+measurement. The hidden worker mode requires a per-run parent token so the
+documented interface cannot accidentally bypass monitoring. Benchmark output
+is one JSON document. It binds
 the imported Python source tree, harness, generated deck, bundle, and policy by
 SHA-256 and reports both audit time and externally monitored worker wall time.
 Timing is diagnostic and is comparable only on the same machine, interpreter,
@@ -95,9 +115,10 @@ SHA-256 `31ffb42633b8b39b54271038b080929cdb4cd529bb9e98d8f2cfd5428fbefb69`.
 They are retained unchanged rather than relabeled as measurements of a later
 version.
 
-## Source-bound v0.7 Windows run
+## Earlier source-bound v0.7 Windows run
 
-The same three profiles were rerun sequentially on 2026-09-09 with CPython
+Before the Linux exit-monitor correction, the same three profiles were rerun
+sequentially on 2026-09-09 with CPython
 3.11.2 and tool version `0.7.0`. Each new result binds imported source-tree
 SHA-256 `e3058f08dcaf4d3b97ff6c7e0f584b5c987545faf287a4a88ab28766db546e18`
 and the unchanged harness SHA-256
@@ -120,6 +141,59 @@ recorded times are higher than the historical observations, but these runs do
 not isolate the cause or establish a speedup or regression attributable to the
 implementation alone. The million-resistor profile still connects its repeated
 devices to only two expanded electrical nets; it is not a million-node graph.
+
+## Intermediate exit-monitor replay
+
+After the bounded Linux exit-confirmation correction, all three profiles were
+run again sequentially on Windows with CPython 3.11.2 and unchanged imported
+v0.7 source-tree SHA-256
+`e3058f08dcaf4d3b97ff6c7e0f584b5c987545faf287a4a88ab28766db546e18`.
+These intermediate records bind harness SHA-256
+`318638e69f01cff0935f066e3093205b96705401852d31b364f330d8fd52aaac`;
+the preceding tables retain their original harness identities.
+
+| Profile | Actual materialized R / X / V | Audit time | Worker wall time | Observed peak RSS | Evidence |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| depth 4 | 10,000 / 1,111 / 1 | 276.8061 ms | 0.922 s | 30.32 MiB | [JSON](../benchmarks/results/hierarchy-scale-windows-20260909-v070-monitorfix-depth4.json) |
+| depth 5 | 100,000 / 11,111 / 1 | 3,295.5582 ms | 3.922 s | 82.61 MiB | [JSON](../benchmarks/results/hierarchy-scale-windows-20260909-v070-monitorfix-depth5.json) |
+| depth 6 | 1,000,000 / 111,111 / 1 | 71,201.8415 ms | 71.813 s | 605.36 MiB | [JSON](../benchmarks/results/hierarchy-scale-windows-20260909-v070-monitorfix-depth6.json) |
+
+All three completed the unchanged closed-form and graph-materialization
+oracles, with zero findings and `allow`. The guards remained 3 GiB and 180
+seconds. Other host work and scheduling were not controlled; these timings are
+not evidence of an implementation speedup over either earlier table. The
+deterministic regression tests separately reproduce missing Linux memory
+fields before wait status is available, retain a previously observed peak only
+after bounded confirmed exit, and reject an unmeasurable still-live worker,
+initially absent samples, malformed counters, and expired deadlines.
+
+This intermediate monitor still checked the ordinary already-exited path's
+wall time inconsistently. The final monitor below adds an unconditional
+pre-acceptance deadline check and checks the final elapsed time after output
+collection. These records are retained with their original harness identity,
+not represented as results of that final monitor.
+
+## Final monitor replay
+
+The final runner was exercised with the same three profiles, sequentially on
+Windows and CPython 3.11.2. All records bind unchanged imported source-tree
+SHA-256 `e3058f08dcaf4d3b97ff6c7e0f584b5c987545faf287a4a88ab28766db546e18`
+and final harness SHA-256
+`c11d99182f5c373d2d759f54f5a6ce10f789770c95540b136db7bfba6e951666`.
+
+| Profile | Actual materialized R / X / V | Audit time | Worker wall time | Observed peak RSS | Evidence |
+| ---: | ---: | ---: | ---: | ---: | --- |
+| depth 4 | 10,000 / 1,111 / 1 | 243.7670 ms | 0.781 s | 30.32 MiB | [JSON](../benchmarks/results/hierarchy-scale-windows-20260909-v070-final-monitor-depth4.json) |
+| depth 5 | 100,000 / 11,111 / 1 | 2,822.9634 ms | 3.532 s | 82.59 MiB | [JSON](../benchmarks/results/hierarchy-scale-windows-20260909-v070-final-monitor-depth5.json) |
+| depth 6 | 1,000,000 / 111,111 / 1 | 78,290.0585 ms | 79.047 s | 605.28 MiB | [JSON](../benchmarks/results/hierarchy-scale-windows-20260909-v070-final-monitor-depth6.json) |
+
+All three passed the closed-form, materialized-graph, decision, and finding
+oracles under unchanged 3 GiB / 180-second supervision. These observed worker
+wall times include output collection and remain below the configured cap.
+Concurrent host work was not controlled, so differences from preceding tables
+must not be attributed to the monitor correction or audit implementation as a
+performance improvement. The same two-expanded-net and resistor-only scale
+limitations apply.
 
 ## Scope of the result
 

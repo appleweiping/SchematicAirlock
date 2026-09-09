@@ -282,20 +282,18 @@ def _linux_process_memory(pid: int) -> MemorySample | None:
     except FileNotFoundError:
         return None
     values: dict[str, int] = {}
-    state = ""
     for line in lines:
         key, separator, remainder = line.partition(":")
-        if separator and key == "State":
-            state = remainder.strip()
         if separator and key in {"VmRSS", "VmHWM"}:
             fields = remainder.split()
             if len(fields) != 2 or fields[1] != "kB":
                 raise HierarchyScaleError(f"unexpected /proc memory field: {line!r}")
             values[key] = int(fields[0]) * 1024
     if "VmRSS" not in values:
-        if state.startswith("Z"):
-            return None
-        raise HierarchyScaleError("worker /proc status omitted VmRSS")
+        # Linux can release a dying process's address space before publishing
+        # its zombie state or wait status.  Missing fields are not proof of
+        # exit; the parent must independently confirm it within a fixed bound.
+        return None
     return MemorySample(values["VmRSS"], values.get("VmHWM", values["VmRSS"]), "VmHWM")
 
 
@@ -410,13 +408,28 @@ def _monitor_process(
                         f"(observed {observed_peak})"
                     )
             elif return_code is None:
-                raise HierarchyScaleError("could not read resident memory for the live worker")
-            if return_code is not None:
-                break
+                if peak <= 0 or not metric:
+                    raise HierarchyScaleError("could not read resident memory for the live worker")
+                remaining = timeout_seconds - (clock() - started)
+                if remaining <= 0:
+                    raise HierarchyScaleLimitError(
+                        f"worker reached wall-time limit {timeout_seconds} seconds"
+                    )
+                try:
+                    # One non-renewable poll interval handles the Linux
+                    # address-space teardown race.  It is allowed only after
+                    # a valid sample and only if wait() actually confirms exit.
+                    return_code = process.wait(timeout=min(_POLL_SECONDS, remaining))
+                except subprocess.TimeoutExpired as exc:
+                    raise HierarchyScaleError(
+                        "could not read resident memory for the live worker"
+                    ) from exc
             if clock() - started >= timeout_seconds:
                 raise HierarchyScaleLimitError(
                     f"worker reached wall-time limit {timeout_seconds} seconds"
                 )
+            if return_code is not None:
+                break
             sleeper(_POLL_SECONDS)
         stdout, stderr = process.communicate()
     except BaseException:
@@ -425,6 +438,8 @@ def _monitor_process(
         _terminate_process(process)
         raise
     elapsed_ms = (clock() - started) * 1_000
+    if elapsed_ms >= timeout_seconds * 1_000:
+        raise HierarchyScaleLimitError(f"worker reached wall-time limit {timeout_seconds} seconds")
     if peak <= 0 or not metric:
         raise HierarchyScaleError("worker finished without an operating-system peak RSS sample")
     return MonitorResult(stdout, stderr, return_code, elapsed_ms, peak, metric)

@@ -196,6 +196,192 @@ def test_monitor_terminates_worker_when_memory_reader_fails(harness: dict[str, A
     assert process.terminated
 
 
+@pytest.mark.parametrize("state", ["R (running)", "Z (zombie)", "X (dead)"])
+def test_linux_memory_reader_leaves_exit_confirmation_to_the_monitor(
+    harness: dict[str, Any], monkeypatch: pytest.MonkeyPatch, state: str
+) -> None:
+    # Linux may release the address space before publishing a zombie state.
+    monkeypatch.setattr(Path, "read_text", lambda *_args, **_kwargs: f"State:\t{state}\n")
+    assert harness["_linux_process_memory"](123) is None
+
+
+class _ClosingProcess:
+    pid = 123
+
+    def __init__(self, *, exits: bool) -> None:
+        self.exits = exits
+        self.returncode: int | None = None
+        self.terminated = False
+        self.wait_timeouts: list[float] = []
+
+    def poll(self) -> int | None:
+        return self.returncode
+
+    def wait(self, timeout: float) -> int:
+        self.wait_timeouts.append(timeout)
+        if self.exits or self.terminated:
+            self.returncode = 0 if self.exits else -1
+            return self.returncode
+        raise subprocess.TimeoutExpired("still-live-worker", timeout)
+
+    def terminate(self) -> None:
+        self.terminated = True
+
+    def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+        assert self.returncode is not None
+        return "payload", ""
+
+
+def test_monitor_confirms_exit_after_linux_tears_down_memory_before_wait_status(
+    harness: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    process = _ClosingProcess(exits=True)
+    samples = iter((harness["MemorySample"](80, 90, "VmHWM"), None))
+    monkeypatch.setattr(Path, "read_text", lambda *_args, **_kwargs: "State:\tR (running)\n")
+
+    def memory_reader(pid: int) -> Any:
+        sample = next(samples)
+        return sample if sample is not None else harness["_linux_process_memory"](pid)
+
+    result = harness["_monitor_process"](
+        process,
+        timeout_seconds=180,
+        rss_limit_bytes=100,
+        memory_reader=memory_reader,
+        clock=lambda: 0.0,
+        sleeper=lambda _seconds: None,
+    )
+    assert result.return_code == 0
+    assert result.peak_resident_bytes == 90
+    assert result.memory_metric == "VmHWM"
+    assert result.stdout == "payload"
+    assert process.wait_timeouts == [harness["_POLL_SECONDS"]]
+    assert not process.terminated
+
+
+def test_missing_memory_cannot_extend_live_worker_past_one_exit_confirmation(
+    harness: dict[str, Any],
+) -> None:
+    process = _ClosingProcess(exits=False)
+    samples = iter((harness["MemorySample"](80, 90, "VmHWM"), None))
+    with pytest.raises(harness["HierarchyScaleError"], match="live worker"):
+        harness["_monitor_process"](
+            process,
+            timeout_seconds=180,
+            rss_limit_bytes=100,
+            memory_reader=lambda _pid: next(samples),
+            clock=lambda: 0.0,
+            sleeper=lambda _seconds: None,
+        )
+    assert process.terminated
+    assert process.wait_timeouts == [harness["_POLL_SECONDS"], 5]
+
+
+def test_missing_memory_without_a_previous_sample_never_gets_exit_grace(
+    harness: dict[str, Any],
+) -> None:
+    process = _ClosingProcess(exits=False)
+    with pytest.raises(harness["HierarchyScaleError"], match="live worker"):
+        harness["_monitor_process"](
+            process,
+            timeout_seconds=180,
+            rss_limit_bytes=100,
+            memory_reader=lambda _pid: None,
+            clock=lambda: 0.0,
+            sleeper=lambda _seconds: None,
+        )
+    assert process.terminated
+    assert process.wait_timeouts == [5]
+
+
+def test_exit_confirmation_is_clipped_to_remaining_wall_time(harness: dict[str, Any]) -> None:
+    process = _ClosingProcess(exits=True)
+    samples = iter((harness["MemorySample"](80, 90, "VmHWM"), None))
+    times = iter((0.0, 0.0, 179.995, 179.997, 179.998))
+    result = harness["_monitor_process"](
+        process,
+        timeout_seconds=180,
+        rss_limit_bytes=100,
+        memory_reader=lambda _pid: next(samples),
+        clock=lambda: next(times),
+        sleeper=lambda _seconds: None,
+    )
+    assert result.return_code == 0
+    assert process.wait_timeouts == [pytest.approx(0.005)]
+    assert result.wall_ms == pytest.approx(179_998)
+
+
+@pytest.mark.parametrize("expires_before_wait", [True, False])
+def test_exit_confirmation_cannot_accept_an_expired_wall_deadline(
+    harness: dict[str, Any], expires_before_wait: bool
+) -> None:
+    process = _ClosingProcess(exits=True)
+    samples = iter((harness["MemorySample"](80, 90, "VmHWM"), None))
+    times = iter((0.0, 0.0, 180.0) if expires_before_wait else (0.0, 0.0, 179.995, 180.0))
+    with pytest.raises(harness["HierarchyScaleLimitError"], match="wall-time limit"):
+        harness["_monitor_process"](
+            process,
+            timeout_seconds=180,
+            rss_limit_bytes=100,
+            memory_reader=lambda _pid: next(samples),
+            clock=lambda: next(times),
+            sleeper=lambda _seconds: None,
+        )
+    if expires_before_wait:
+        assert process.terminated
+        assert process.wait_timeouts == [5]
+    else:
+        assert not process.terminated
+        assert process.wait_timeouts == [pytest.approx(0.005)]
+
+
+def test_malformed_linux_memory_field_remains_an_error(
+    harness: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(Path, "read_text", lambda *_args, **_kwargs: "VmRSS:\t1 MB\n")
+    with pytest.raises(harness["HierarchyScaleError"], match="unexpected /proc memory field"):
+        harness["_linux_process_memory"](123)
+
+
+@pytest.mark.parametrize("expires_after_collection", [True, False])
+def test_ordinary_exit_cannot_return_at_or_after_wall_limit(
+    harness: dict[str, Any], expires_after_collection: bool
+) -> None:
+    process = _ClosingProcess(exits=True)
+    process.returncode = 0
+    times = iter((0.0, 179.99, 180.0) if expires_after_collection else (0.0, 180.0))
+    with pytest.raises(harness["HierarchyScaleLimitError"], match="wall-time limit"):
+        harness["_monitor_process"](
+            process,
+            timeout_seconds=180,
+            rss_limit_bytes=100,
+            memory_reader=lambda _pid: harness["MemorySample"](80, 90, "VmHWM"),
+            clock=lambda: next(times),
+            sleeper=lambda _seconds: None,
+        )
+    assert not process.terminated
+    assert process.wait_timeouts == []
+
+
+def test_ordinary_exit_within_wall_limit_keeps_its_observed_peak(harness: dict[str, Any]) -> None:
+    process = _ClosingProcess(exits=True)
+    process.returncode = 0
+    times = iter((0.0, 179.9, 179.95))
+    result = harness["_monitor_process"](
+        process,
+        timeout_seconds=180,
+        rss_limit_bytes=100,
+        memory_reader=lambda _pid: harness["MemorySample"](80, 90, "VmHWM"),
+        clock=lambda: next(times),
+        sleeper=lambda _seconds: None,
+    )
+    assert result.return_code == 0
+    assert result.wall_ms == pytest.approx(179_950)
+    assert result.peak_resident_bytes == 90
+    assert not process.terminated
+    assert process.wait_timeouts == []
+
+
 @pytest.mark.parametrize(
     ("arguments", "match"),
     [
@@ -260,8 +446,9 @@ def test_cli_returns_one_valid_json_document(harness: dict[str, Any]) -> None:
         capture_output=True,
         text=True,
         timeout=40,
-        check=True,
+        check=False,
     )
+    assert completed.returncode == 0, completed.stderr
     parsed = json.loads(completed.stdout)
     assert parsed["schema"] == "org.schematic-airlock.hierarchy-scale-benchmark"
     assert parsed["known_expected_passed"] is True
