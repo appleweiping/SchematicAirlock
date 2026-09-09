@@ -353,7 +353,7 @@ jobs:
           path: dist
       - name: Re-verify downloaded release assets
         run: >-
-          python src/schematic_airlock/release_artifacts.py verify-release
+          python -I src/schematic_airlock/release_artifacts.py verify-release
           --directory dist
           --name "$RELEASE_PROJECT_NAME"
           --version "$RELEASE_PROJECT_VERSION"
@@ -385,7 +385,7 @@ jobs:
           path: dist
       - name: Re-verify downloaded release assets
         run: >-
-          python src/schematic_airlock/release_artifacts.py verify-release
+          python -I src/schematic_airlock/release_artifacts.py verify-release
           --directory dist
           --name "$RELEASE_PROJECT_NAME"
           --version "$RELEASE_PROJECT_VERSION"
