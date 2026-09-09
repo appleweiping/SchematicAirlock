@@ -15,7 +15,7 @@ permissions:
 
 env:
   RELEASE_PROJECT_NAME: schematic-airlock
-  RELEASE_PROJECT_VERSION: "0.4.1"
+  RELEASE_PROJECT_VERSION: "0.5.0"
   RELEASE_SYFT_VERSION: "1.51.1"
 
 jobs:
@@ -60,7 +60,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           for attempt in $(seq 1 90); do
-            successful="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=100" --jq '[.workflow_runs[] | select(.conclusion == "success" and .event == "push" and .head_branch == "main")] | length')"
+            successful="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&per_page=100" --jq "[.workflow_runs[] | select(.conclusion == \"success\" and .event == \"push\" and .head_branch == \"main\" and .head_sha == \"$GITHUB_SHA\")] | length")"
             if [ "$successful" -gt 0 ]; then
               echo "verified successful CI workflow for $GITHUB_SHA"
               exit 0
@@ -152,6 +152,7 @@ jobs:
           required_source = {
               "CITATION.cff",
               "benchmarks/manifest.json",
+              "benchmarks/voltage_constraints.py",
               "corpus/portable_analog/primitives.lib",
               "corpus/portable_analog/rc_sensor_frontend.sp",
               "corpus/portable_analog/two_stage_ota.sp",
@@ -160,8 +161,17 @@ jobs:
               "docs/schemas/structural-summary-v1.schema.json",
               "docs/schemas/verification-manifest-v1.schema.json",
               "docs/schemas/verification-report-v1.schema.json",
+              "docs/schemas/voltage-rules-v1.schema.json",
+              "docs/schemas/voltage-report-v1.schema.json",
+              "docs/voltage-envelopes.md",
+              "examples/voltage_envelope/design.sp",
+              "examples/voltage_envelope/rules.json",
+              "src/schematic_airlock/dco.py",
               "src/schematic_airlock/distribution_audit.py",
               "src/schematic_airlock/release_artifacts.py",
+              "src/schematic_airlock/voltage.py",
+              "src/schematic_airlock/voltage_constraints.py",
+              "src/schematic_airlock/voltage_rules.py",
           }
           if missing := required_source - source_names:
               raise SystemExit(f"source distribution is missing: {sorted(missing)}")
@@ -169,6 +179,7 @@ jobs:
               wheel_names = audit_wheel(archive)
           required_wheel = {
               "schematic_airlock/_version.py",
+              "schematic_airlock/dco.py",
               "schematic_airlock/distribution_audit.py",
               "schematic_airlock/py.typed",
               "schematic_airlock/release_artifacts.py",
@@ -177,6 +188,11 @@ jobs:
               "schematic_airlock/schemas/structural-summary-v1.schema.json",
               "schematic_airlock/schemas/verification-manifest-v1.schema.json",
               "schematic_airlock/schemas/verification-report-v1.schema.json",
+              "schematic_airlock/schemas/voltage-rules-v1.schema.json",
+              "schematic_airlock/schemas/voltage-report-v1.schema.json",
+              "schematic_airlock/voltage.py",
+              "schematic_airlock/voltage_constraints.py",
+              "schematic_airlock/voltage_rules.py",
           }
           if missing := required_wheel - wheel_names:
               raise SystemExit(f"wheel is missing: {sorted(missing)}")
@@ -223,6 +239,34 @@ jobs:
           )
           if json.loads(verified.stdout)["decision"] != "allow":
               raise SystemExit("installed verification CLI smoke did not allow clean evidence")
+          for name in ("voltage-rules-v1", "voltage-report-v1"):
+              schema = json.loads(files("schematic_airlock").joinpath(
+                  f"schemas/{name}.schema.json"
+              ).read_text(encoding="utf-8"))
+              if schema["$schema"] != "https://json-schema.org/draft/2020-12/schema":
+                  raise SystemExit(f"installed {name} schema has the wrong dialect")
+          voltage = subprocess.run(
+              [
+                  ".release-smoke/bin/schematic-airlock",
+                  "voltage-check", "examples/voltage_envelope/design.sp",
+                  "--rules", "examples/voltage_envelope/rules.json",
+                  "--format", "json",
+              ],
+              check=False, capture_output=True, text=True,
+          )
+          report = json.loads(voltage.stdout)
+          failures = {
+              item["name"]: item["status"]
+              for item in report["checks"] if item["status"] != "pass"
+          }
+          if (
+              voltage.returncode != 2 or voltage.stderr
+              or report["status"] != "possible-violation"
+              or len(report["checks"]) != 13
+              or failures != {"device:top/mp:bd": "possible-violation"}
+              or report["tool_version"] != expected
+          ):
+              raise SystemExit("installed voltage CLI did not reproduce the body-diode oracle")
           PY
           site_packages="$(.release-smoke/bin/python -I -c 'import sysconfig; print(sysconfig.get_path("purelib"))')"
           installation_root="$(realpath .release-smoke)"

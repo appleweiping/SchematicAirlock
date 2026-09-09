@@ -369,6 +369,19 @@ def test_finding_order_and_ids_are_stable() -> None:
     assert len({finding.finding_id for finding in first}) == len(first)
 
 
+def test_nested_expansion_preserves_parent_internal_net_identity() -> None:
+    graph = context(
+        "XLEFT left 0 parent\nXRIGHT right 0 parent\n"
+        ".subckt parent p n\nV1 internal n 1\nXLEAF p internal leaf\n.ends\n"
+        ".subckt leaf p n\nR1 p n 0\n.ends\n"
+    ).graph
+    nodes = {device.qualified_name: device.element.nodes for device in graph.expanded_devices}
+    assert nodes["top/XLEFT/V1"] == ("top/XLEFT:internal", "0")
+    assert nodes["top/XLEFT/XLEAF/R1"] == ("left", "top/XLEFT:internal")
+    assert nodes["top/XRIGHT/XLEAF/R1"] == ("right", "top/XRIGHT:internal")
+    assert nodes["top/XLEFT/XLEAF"] == ("left", "top/XLEFT:internal")
+
+
 def test_every_actionable_finding_has_location_or_bundle_scope() -> None:
     findings = run_checks(context("V1 vdd 0 30\nR0 vdd 0 0\n.control\n"))
     assert findings

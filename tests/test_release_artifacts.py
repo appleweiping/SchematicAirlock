@@ -5,6 +5,7 @@ import copy
 import hashlib
 import json
 import zipfile
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -77,8 +78,14 @@ def spdx_document(*, package_name: str = NAME) -> dict[str, object]:
     file_id = "SPDXRef-File-schematic-airlock-init-py"
     return {
         "spdxVersion": "SPDX-2.3",
+        "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "creationInfo": {"creators": [f"Tool: syft-{SYFT_VERSION}"]},
+        "name": f"{NAME} installed environment",
+        "documentNamespace": f"https://example.invalid/spdx/{NAME}/{VERSION}",
+        "creationInfo": {
+            "creators": [f"Tool: syft-{SYFT_VERSION}"],
+            "created": "2026-09-08T00:00:00Z",
+        },
         "packages": [
             {
                 "name": package_name,
@@ -127,6 +134,38 @@ def test_spdx_accepts_normalized_name_and_required_relationships(package_name: s
         expected_version=VERSION,
         expected_syft_version=SYFT_VERSION,
     )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        (lambda data: data.pop("dataLicense"), "dataLicense"),
+        (lambda data: data.update(dataLicense="MIT"), "dataLicense"),
+        (lambda data: data.update(name=""), "name"),
+        (lambda data: data.update(name="unsafe\nname"), "name"),
+        (lambda data: data.update(documentNamespace="relative/path"), "documentNamespace"),
+        (
+            lambda data: data.update(documentNamespace="https://example.invalid/spdx#fragment"),
+            "documentNamespace",
+        ),
+        (lambda data: data["creationInfo"].pop("created"), "created"),
+        (lambda data: data["creationInfo"].update(created="2026-02-30T00:00:00Z"), "created"),
+        (
+            lambda data: data["creationInfo"].update(created="2026-09-08T00:00:00+00:00"),
+            "created",
+        ),
+    ],
+)
+def test_spdx_rejects_invalid_document_header(mutation: object, message: str) -> None:
+    document = spdx_document()
+    mutation(document)  # type: ignore[operator]
+    with pytest.raises(ReleaseArtifactError, match=message):
+        validate_spdx(
+            document,
+            expected_name=NAME,
+            expected_version=VERSION,
+            expected_syft_version=SYFT_VERSION,
+        )
 
 
 @pytest.mark.parametrize(
@@ -303,8 +342,14 @@ def raw_syft_document() -> dict[str, object]:
     package_id = "SPDXRef-Package-python-schematic-airlock"
     return {
         "spdxVersion": "SPDX-2.3",
+        "dataLicense": "CC0-1.0",
         "SPDXID": "SPDXRef-DOCUMENT",
-        "creationInfo": {"creators": [f"Tool: syft-{SYFT_VERSION}"]},
+        "name": f"{NAME} installed environment",
+        "documentNamespace": f"https://example.invalid/spdx/{NAME}/{VERSION}",
+        "creationInfo": {
+            "creators": [f"Tool: syft-{SYFT_VERSION}"],
+            "created": "2026-09-08T00:00:00Z",
+        },
         "packages": [
             {
                 "name": NAME,
@@ -793,6 +838,23 @@ def test_bind_installed_wheel_adds_record_backed_spdx_relationships(tmp_path: Pa
     )
 
 
+def test_bind_installed_wheel_rejects_invalid_document_header(tmp_path: Path) -> None:
+    site_packages, wheel = installed_tree(tmp_path / "site-packages")
+    document = raw_syft_document()
+    document.pop("dataLicense")
+    sbom = tmp_path / "sbom.json"
+    sbom.write_text(json.dumps(document), encoding="utf-8")
+
+    with pytest.raises(ReleaseArtifactError, match="dataLicense"):
+        bind_installed_wheel(
+            sbom,
+            site_packages,
+            wheel,
+            expected_name=NAME,
+            expected_version=VERSION,
+        )
+
+
 def test_bind_installed_wheel_rejects_record_content_mismatch(tmp_path: Path) -> None:
     site_packages, wheel = installed_tree(tmp_path / "site-packages")
     (site_packages / "schematic_airlock" / "__init__.py").write_bytes(b"tampered")
@@ -1185,11 +1247,66 @@ def test_spdx_loader_rejects_invalid_root_and_size_limit(tmp_path: Path, monkeyp
     with pytest.raises(ReleaseArtifactError, match="root must"):
         release_artifacts.load_spdx(sbom)
     sbom.write_text("{", encoding="utf-8")
-    with pytest.raises(ReleaseArtifactError, match="valid UTF-8 JSON"):
+    with pytest.raises(ReleaseArtifactError, match="JSON"):
         release_artifacts.load_spdx(sbom)
     monkeypatch.setattr(release_artifacts, "_MAX_SBOM_BYTES", 1)
     sbom.write_text("{}", encoding="utf-8")
     with pytest.raises(ReleaseArtifactError, match="exceeds"):
+        release_artifacts.load_spdx(sbom)
+
+
+def test_spdx_loader_bounds_the_file_read(tmp_path: Path, monkeypatch) -> None:
+    sbom = tmp_path / "sbom.json"
+    sbom.write_text("{}", encoding="utf-8")
+    observed_reads: list[int] = []
+    original_open = Path.open
+
+    class ReadSpy(BytesIO):
+        def read(self, size: int = -1) -> bytes:
+            observed_reads.append(size)
+            return super().read(size)
+
+    def open_spy(path: Path, mode: str = "r", *args: object, **kwargs: object):
+        if path == sbom and mode == "rb":
+            return ReadSpy(b"{}")
+        return original_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(release_artifacts, "_MAX_SBOM_BYTES", 7)
+    monkeypatch.setattr(Path, "open", open_spy)
+
+    assert release_artifacts.load_spdx(sbom) == {}
+    assert observed_reads == [8]
+
+
+def test_spdx_loader_normalizes_excessive_json_nesting(tmp_path: Path) -> None:
+    sbom = tmp_path / "sbom.json"
+    sbom.write_text("[" * 2_000 + "0" + "]" * 2_000, encoding="utf-8")
+
+    with pytest.raises(ReleaseArtifactError, match="JSON"):
+        release_artifacts.load_spdx(sbom)
+
+
+def test_spdx_loader_bounds_json_nodes(tmp_path: Path, monkeypatch) -> None:
+    sbom = tmp_path / "sbom.json"
+    sbom.write_text('{"first": 1, "second": 2}', encoding="utf-8")
+    monkeypatch.setattr(release_artifacts, "_MAX_JSON_NODES", 2)
+
+    with pytest.raises(ReleaseArtifactError, match="complexity"):
+        release_artifacts.load_spdx(sbom)
+
+
+@pytest.mark.parametrize("parser_error", [OverflowError("depth"), ValueError("parser")])
+def test_spdx_loader_normalizes_json_parser_errors(
+    tmp_path: Path, monkeypatch, parser_error: Exception
+) -> None:
+    sbom = tmp_path / "sbom.json"
+    sbom.write_text("{}", encoding="utf-8")
+
+    def fail_parser(*args: object, **kwargs: object) -> object:
+        raise parser_error
+
+    monkeypatch.setattr(release_artifacts.json, "loads", fail_parser)
+    with pytest.raises(ReleaseArtifactError, match="valid UTF-8 JSON"):
         release_artifacts.load_spdx(sbom)
 
 

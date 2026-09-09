@@ -1,0 +1,36 @@
+{
+  "date_utc": "2026-09-09",
+  "environment": "Shared Windows host, CPython 3.11.2; tracemalloc enabled",
+  "implementation_state": "Unreleased voltage feature on the v0.4.1 installed development distribution",
+  "scope": "Exact constraint kernel only; excludes netlist parser, hierarchy, nonlinear/ERC checks and total process RSS",
+  "implementation_sha256": "bfee1a4d601fb581a0f9af5f1eaa3ecc910cc65dd22346349d47799180ae2304",
+  "harness_sha256": "4fe78eeda690551b56a3ce8b993719bf9debae096bace37bab24c7bf9e264ab5",
+  "runs": [
+    {
+      "sources": 100000,
+      "repetitions": 1,
+      "step_volts": "1/1000",
+      "observed_lower_volts": "100",
+      "observed_upper_volts": "100",
+      "elapsed_ms": 22017.2875,
+      "peak_python_traced_bytes": 71196770,
+      "components": 1,
+      "edge_visits": 0,
+      "closed_form_oracle_passed": true,
+      "workload_sha256": "f257bf4fe60df6392c0239b43aadc78e9712940232bdbb48397eced19d7352e2"
+    },
+    {
+      "sources": 1000000,
+      "repetitions": 1,
+      "step_volts": "1/1000",
+      "observed_lower_volts": "1000",
+      "observed_upper_volts": "1000",
+      "elapsed_ms": 264288.8539,
+      "peak_python_traced_bytes": 657279109,
+      "components": 1,
+      "edge_visits": 0,
+      "closed_form_oracle_passed": true,
+      "workload_sha256": "ea94fcbf41805acfb109b4c67f09c21915b4ab81670cb002ce7032e825ab81f7"
+    }
+  ]
+}

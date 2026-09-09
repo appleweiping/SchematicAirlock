@@ -22,6 +22,7 @@ from schematic_airlock.verification import (
     verification_report_text,
     verify_path,
 )
+from schematic_airlock.voltage import check_voltages_path, voltage_report_json, voltage_report_text
 
 EXIT_OK = 0
 EXIT_GATE = 2
@@ -99,6 +100,16 @@ def _parser() -> argparse.ArgumentParser:
         default="review",
         help="minimum decision that produces exit code 2",
     )
+    voltage = subcommands.add_parser(
+        "voltage-check", help="check exact DC voltage envelopes and explicit device ratings"
+    )
+    voltage.add_argument("path", help="netlist file or bundle directory")
+    voltage.add_argument("--entry", help="bundle-relative entry netlist")
+    voltage.add_argument("--rules", required=True, help="versioned voltage-rules JSON")
+    voltage.add_argument("--format", choices=("text", "json"), default="text")
+    voltage.add_argument("--pretty", action="store_true")
+    voltage.add_argument("--output", help="write report to this file")
+    voltage.add_argument("--force", action="store_true", help="replace an existing output")
     return parser
 
 
@@ -206,6 +217,19 @@ def main(
             return EXIT_GATE if report.decision.rank >= threshold.rank else EXIT_OK
         if args.command == "verification-check":
             return _verification(args, output)
+        if args.command == "voltage-check":
+            voltage = check_voltages_path(args.path, entry=args.entry, rules=args.rules)
+            rendered = (
+                voltage_report_json(voltage, pretty=args.pretty)
+                if args.format == "json"
+                else voltage_report_text(voltage)
+            )
+            protected = (
+                Path(args.rules),
+                *(Path(voltage.root) / item.path for item in voltage.files),
+            )
+            _write_output(rendered, args.output, output, protected=protected, force=args.force)
+            return EXIT_OK if voltage.status == "pass" else EXIT_GATE
     except (AirlockError, OSError, UnicodeError, ValueError) as exc:
         errors.write(f"schematic-airlock: {exc}\n")
         return EXIT_INPUT

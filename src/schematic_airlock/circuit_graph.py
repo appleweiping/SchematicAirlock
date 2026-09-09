@@ -268,9 +268,17 @@ def build_circuit_graph(
         if len(expanded_devices) > max_expanded_instances:
             return
         for element in elements:
+            mapped_nodes = tuple(
+                "0"
+                if node.lower() == "0"
+                else node_map.get(
+                    node.lower(), node.lower() if path == "top" else f"{path}:{node.lower()}"
+                )
+                for node in element.nodes
+            )
             if element.kind == "X" and element.model is not None:
                 definition = definitions.get(element.model.lower())
-                expanded_devices.append(Device(path, element))
+                expanded_devices.append(Device(path, replace(element, nodes=mapped_nodes)))
                 if definition is None or definition.name.lower() in stack:
                     continue
                 child_parameters = assignments_with_issues(
@@ -284,8 +292,8 @@ def build_circuit_graph(
                     element,
                 )
                 child_nodes = {
-                    port.lower(): node_map.get(node.lower(), node.lower())
-                    for port, node in zip(definition.ports, element.nodes, strict=False)
+                    port.lower(): node
+                    for port, node in zip(definition.ports, mapped_nodes, strict=False)
                 }
                 expand_elements(
                     list(definition.elements),
@@ -295,14 +303,6 @@ def build_circuit_graph(
                     (*stack, definition.name.lower()),
                 )
                 continue
-            mapped_nodes = tuple(
-                "0"
-                if node.lower() == "0"
-                else node_map.get(
-                    node.lower(), node.lower() if path == "top" else f"{path}:{node.lower()}"
-                )
-                for node in element.nodes
-            )
             value = element.value
             if value is not None:
                 with suppress(ValueError):
