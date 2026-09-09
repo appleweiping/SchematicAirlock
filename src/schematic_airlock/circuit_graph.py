@@ -3,14 +3,22 @@
 from __future__ import annotations
 
 from collections import Counter, defaultdict, deque
+from collections.abc import Iterable
 from contextlib import suppress
 from dataclasses import dataclass, replace
 from decimal import Decimal
 
-from schematic_airlock.domain import SourceLocation
+from schematic_airlock.domain import InputError, SourceLocation
 from schematic_airlock.include_graph import IncludeGraph
-from schematic_airlock.parse import Element, Subcircuit
-from schematic_airlock.units import decimal_text, evaluate_expression, parameter_assignments
+from schematic_airlock.parse import Directive, Element, Subcircuit
+from schematic_airlock.units import (
+    decimal_text,
+    evaluate_expression,
+    parameter_assignment_parts,
+    parameter_assignments,
+)
+
+_MAX_PARAMETER_EVALUATIONS = 1_000_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,40 +231,119 @@ def build_circuit_graph(
 
     expanded = expansion_cost("top", ())
 
-    top_parameters: dict[str, Decimal] = {}
-    for directive in includes.parameter_directives:
-        try:
-            top_parameters = parameter_assignments(directive.arguments, top_parameters)
-        except ValueError as exc:
-            issues.append(
-                GraphIssue(
-                    "GRAPH008",
-                    f"parameter expression cannot be evaluated: {exc}",
-                    directive.location,
-                    directive.raw,
-                )
-            )
     expanded_devices: list[Device] = []
+    parameter_work_remaining = _MAX_PARAMETER_EVALUATIONS
+    parameter_budget_reported = False
 
-    def assignments_with_issues(
-        assignments: list[str],
+    def resolve_declarations(
+        declarations_in_order: Iterable[tuple[str, Element | Directive]],
         inherited: dict[str, Decimal],
-        element: Element,
     ) -> dict[str, Decimal]:
-        values = dict(inherited)
-        for assignment in assignments:
+        nonlocal parameter_work_remaining, parameter_budget_reported
+        declarations: dict[str, tuple[str, Element | Directive]] = {}
+        for token, source in declarations_in_order:
             try:
-                values = parameter_assignments([assignment], values)
-            except ValueError as exc:
+                parameter_assignment_parts(token)
+            except (ValueError, InputError) as exc:
+                # A later override cannot erase an earlier malformed source
+                # declaration. Keep the invalid final token too, so it shadows
+                # an older same-named value until explicitly replaced.
                 issues.append(
                     GraphIssue(
                         "GRAPH008",
-                        f"instance parameter expression cannot be evaluated: {exc}",
-                        element.location,
-                        element.raw,
+                        f"invalid parameter declaration: {exc}",
+                        source.location,
+                        source.raw,
                     )
                 )
+            name = token.split("=", 1)[0].lower()
+            if name not in declarations and len(declarations) == 128:
+                issues.append(
+                    GraphIssue(
+                        "GRAPH008",
+                        "parameters exceed the 128-name budget",
+                        source.location,
+                        source.raw,
+                    )
+                )
+                return {}
+            declarations[name] = (token, source)
+        values = dict(inherited)
+        for name in declarations:
+            values.pop(name, None)
+        if len(set(values) | declarations.keys()) > 128:
+            source = next(iter(declarations.values()))[1]
+            issues.append(
+                GraphIssue(
+                    "GRAPH008",
+                    "instance parameters exceed the 128-name budget",
+                    source.location,
+                    source.raw,
+                )
+            )
+            return values
+        pending = dict(declarations)
+        errors: dict[str, str] = {}
+        while pending:
+            progress = False
+            for name, (assignment, source) in tuple(pending.items()):
+                if parameter_work_remaining == 0:
+                    if not parameter_budget_reported:
+                        issues.append(
+                            GraphIssue(
+                                "GRAPH008",
+                                "hierarchy parameter evaluation budget exhausted",
+                                source.location,
+                                source.raw,
+                            )
+                        )
+                        parameter_budget_reported = True
+                    return values
+                parameter_work_remaining -= 1
+                try:
+                    updated = parameter_assignments([assignment], values, exact=True)
+                except (ValueError, InputError) as exc:
+                    errors[name] = str(exc)
+                else:
+                    values = updated
+                    del pending[name]
+                    progress = True
+            if not progress:
+                break
+        for name, (_assignment, source) in pending.items():
+            issues.append(
+                GraphIssue(
+                    "GRAPH008",
+                    f"parameter expression cannot be evaluated: {errors[name]}",
+                    source.location,
+                    source.raw,
+                )
+            )
         return values
+
+    top_parameters = resolve_declarations(
+        (
+            (token, directive)
+            for directive in includes.parameter_directives
+            for token in directive.arguments
+        ),
+        {},
+    )
+
+    def child_declarations(
+        definition: Subcircuit, element: Element
+    ) -> Iterable[tuple[str, Element | Directive]]:
+        # Merge before evaluating: instance overrides body, body overrides
+        # header, and local names hide inherited values. Derived declarations
+        # therefore see the final override rather than a stale earlier value.
+        for name, value in definition.parameters:
+            yield f"{name}={value}", element
+        for directive in definition.directives:
+            if directive.name == "param":
+                for token in directive.arguments:
+                    yield token, directive
+        for name, value in element.parameters:
+            yield f"{name}={value}", element
 
     def expand_elements(
         elements: list[Element],
@@ -288,15 +375,8 @@ def build_circuit_graph(
                     or len(expanded_devices) >= max_expanded_instances
                 ):
                     continue
-                child_parameters = assignments_with_issues(
-                    [f"{name}={value}" for name, value in definition.parameters],
-                    parameters,
-                    element,
-                )
-                child_parameters = assignments_with_issues(
-                    [f"{name}={value}" for name, value in element.parameters],
-                    child_parameters,
-                    element,
+                child_parameters = resolve_declarations(
+                    child_declarations(definition, element), parameters
                 )
                 child_nodes = {
                     port.lower(): node
@@ -313,7 +393,7 @@ def build_circuit_graph(
             value = element.value
             if value is not None:
                 with suppress(ValueError):
-                    value = decimal_text(evaluate_expression(value, parameters))
+                    value = decimal_text(evaluate_expression(value, parameters, exact=True))
             expanded_devices.append(Device(path, replace(element, nodes=mapped_nodes, value=value)))
 
     expand_elements(top_elements, "top", {}, top_parameters, ())

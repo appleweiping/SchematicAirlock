@@ -170,8 +170,9 @@ SchematicAirlock reports findings in these families:
 - excessive `.tran`, `.dc`, `.ac`, `.step`, and PWL point estimates;
 - missing declared ports, apparently undriven outputs, dangling internal nets,
   and floating MOS gates;
-- conflicting parallel ideal voltage sources, excessive source voltage, and
-  zero-ohm connections between configured power and ground rails;
+- conflicting parallel ideal voltage sources, excessive source voltage, direct
+  declared zero-ohm rail shorts, and composite DC short-intent paths between
+  configured power and ground rails;
 - nodes with no DC path to ground, loops of ideal voltage sources, and decks
   that reference no ground net at all.
 - hierarchy-aware rail/source checks, bounded parameter expressions, and
@@ -181,6 +182,10 @@ Every check is conservative. A review finding identifies an ambiguity that
 needs engineering judgment. A deny finding identifies a violated artifact
 contract or a high-confidence unsafe condition. Policy can override the
 severity of a specific finding code.
+
+The [original manifest-driven electrical-rule corpus](docs/erc-regression-corpus.md)
+locks the positive, negative, and indeterminate boundaries for every current
+electrical finding family and all voltage-envelope result states.
 
 ### Operating points a simulator would refuse
 

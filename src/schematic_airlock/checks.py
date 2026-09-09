@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import math
 import re
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
+from hashlib import sha256
 
 from schematic_airlock.bundle import BundleSource
 from schematic_airlock.circuit_graph import CircuitGraph, Device, Net
@@ -26,7 +27,7 @@ from schematic_airlock.solvability import (
     has_ground,
     voltage_source_loops,
 )
-from schematic_airlock.units import evaluate_expression, parameter_assignments, parse_number
+from schematic_airlock.units import evaluate_expression, parse_number
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,6 +111,48 @@ _LOAD_SEVERITY = {
     "FILE001": Severity.DENY,
     "PATH001": Severity.DENY,
 }
+
+_PURE_SPICE_NUMBER = re.compile(
+    r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?[A-Za-z]*\Z",
+    re.ASCII,
+)
+_MAX_RAIL_WITNESS_DEVICES = 12
+_MAX_RAIL_WITNESS_NAME = 96
+
+
+@dataclass(frozen=True, slots=True)
+class _RailTie:
+    first: str
+    second: str
+    device: Device
+
+
+class _RailUnion:
+    """Near-linear disjoint sets for the declared DC short-intent profile."""
+
+    def __init__(self) -> None:
+        self.parent: dict[str, str] = {}
+        self.size: dict[str, int] = {}
+
+    def find(self, node: str) -> str:
+        if node not in self.parent:
+            self.parent[node] = node
+            self.size[node] = 1
+            return node
+        root = node
+        while self.parent[root] != root:
+            self.parent[root] = self.parent[self.parent[root]]
+            root = self.parent[root]
+        return root
+
+    def union(self, first: str, second: str) -> None:
+        left, right = self.find(first), self.find(second)
+        if left == right:
+            return
+        if self.size[left] < self.size[right]:
+            left, right = right, left
+        self.parent[right] = left
+        self.size[left] += self.size[right]
 
 
 def _finding(
@@ -403,43 +446,44 @@ def _step_points(directive: Directive) -> int | None:
         return None
 
 
-def _scope_parameters(context: CheckContext) -> dict[str, dict[str, Decimal]]:
-    def safe_assignments(
-        tokens: Iterable[str], inherited: Mapping[str, Decimal]
-    ) -> dict[str, Decimal]:
-        values = dict(inherited)
-        for token in tokens:
-            try:
-                values = parameter_assignments([token], values)
-            except ValueError:
-                # Keep the successfully evaluated part of this scope. Any source
-                # that depends on the failed name remains unevaluated and REVIEWed.
-                continue
-        return values
-
-    result: dict[str, dict[str, Decimal]] = {"top": {}}
-    for directive in context.includes.parameter_directives:
-        result["top"] = safe_assignments(directive.arguments, result["top"])
-    for deck in context.includes.decks:
-        for subcircuit in deck.subcircuits:
-            scope = f"subckt:{subcircuit.name.lower()}"
-            values = safe_assignments(
-                (f"{name}={value}" for name, value in subcircuit.parameters),
-                result["top"],
-            )
-            assignments = [
-                arg
-                for item in subcircuit.directives
-                if item.name == "param"
-                for arg in item.arguments
-            ]
-            result[scope] = safe_assignments(assignments, values)
-    return result
-
-
 def _element_findings(context: CheckContext) -> list[Finding]:
     findings: list[Finding] = []
-    parameters = _scope_parameters(context)
+    declared_passives: dict[SourceLocation, Device] = {}
+    reached_passives: set[SourceLocation] = set()
+    checked_passives: set[tuple[SourceLocation, str | None]] = set()
+
+    def check_passive(device: Device) -> None:
+        element = device.element
+        key = (element.location, element.value)
+        if key in checked_passives:
+            return
+        checked_passives.add(key)
+        value = _numeric(element.value)
+        if value is None:
+            findings.append(
+                _finding(
+                    context,
+                    "VAL002",
+                    "Unevaluated passive value",
+                    Severity.REVIEW,
+                    f"{element.name!r} has a value that cannot be statically evaluated",
+                    element.location,
+                    evidence=element.raw,
+                )
+            )
+        elif value < 0 or (element.kind in {"C", "L"} and value == 0):
+            findings.append(
+                _finding(
+                    context,
+                    "VAL001",
+                    "Non-physical passive value",
+                    Severity.DENY,
+                    f"{element.name!r} has non-positive or negative value {element.value!r}",
+                    element.location,
+                    evidence=element.raw,
+                )
+            )
+
     known = {"R", "C", "L", "V", "I", "M", "D", "Q", "X", "E", "G", "F", "H", "B"}
     for device in _all_elements(context.graph):
         element = device.element
@@ -471,63 +515,43 @@ def _element_findings(context: CheckContext) -> list[Finding]:
                 )
             )
         if element.kind in {"R", "C", "L"}:
-            value = _numeric(element.value)
-            if value is None:
-                findings.append(
-                    _finding(
-                        context,
-                        "VAL002",
-                        "Unevaluated passive value",
-                        Severity.REVIEW,
-                        f"{element.name!r} has a value that cannot be statically evaluated",
-                        element.location,
-                        evidence=element.raw,
-                    )
-                )
-            elif value < 0 or (element.kind in {"C", "L"} and value == 0):
-                findings.append(
-                    _finding(
-                        context,
-                        "VAL001",
-                        "Non-physical passive value",
-                        Severity.DENY,
-                        f"{element.name!r} has non-positive or negative value {element.value!r}",
-                        element.location,
-                        evidence=element.raw,
-                    )
-                )
+            declared_passives[element.location] = device
+        # A raw literal remains an artifact-level fact even in a dormant
+        # definition. Parameter-dependent voltages, however, require a reached
+        # instance's final bindings, never a guessed/default scope environment.
         if element.kind == "V":
-            voltage = _numeric(element.value, parameters.get(device.scope))
-            configured_limit = context.policy.electrical.max_abs_source_voltage
-            if voltage is not None and abs(voltage) > Decimal(str(configured_limit)):
+            voltage = _numeric(element.value)
+            limit = context.policy.electrical.max_abs_source_voltage
+            if voltage is not None and voltage.copy_abs() > Decimal(str(limit)):
                 findings.append(
                     _finding(
                         context,
                         "VOLT001",
                         "Source voltage exceeds policy",
                         Severity.DENY,
-                        f"{element.name!r} has magnitude {abs(voltage)} V",
+                        f"{element.name!r} has magnitude {voltage.copy_abs()} V",
                         element.location,
                         evidence=element.raw,
-                        metadata={"limit_volts": configured_limit},
+                        metadata={"limit_volts": limit},
                     )
                 )
-            elif voltage is None:
-                findings.extend(_dynamic_source_findings(context, device, configured_limit))
     for device in _electrical_elements(context.graph):
         element = device.element
+        if element.kind in {"R", "C", "L"}:
+            reached_passives.add(element.location)
+            check_passive(device)
         if element.kind != "V":
             continue
         voltage = _numeric(element.value)
         configured_limit = context.policy.electrical.max_abs_source_voltage
-        if voltage is not None and abs(voltage) > Decimal(str(configured_limit)):
+        if voltage is not None and voltage.copy_abs() > Decimal(str(configured_limit)):
             findings.append(
                 _finding(
                     context,
                     "VOLT001",
                     "Source voltage exceeds policy",
                     Severity.DENY,
-                    f"{element.name!r} has magnitude {abs(voltage)} V",
+                    f"{element.name!r} has magnitude {voltage.copy_abs()} V",
                     element.location,
                     evidence=element.raw,
                     metadata={"limit_volts": configured_limit},
@@ -535,6 +559,9 @@ def _element_findings(context: CheckContext) -> list[Finding]:
             )
         elif voltage is None:
             findings.extend(_dynamic_source_findings(context, device, configured_limit))
+    for location, device in declared_passives.items():
+        if location not in reached_passives:
+            check_passive(device)
     return findings
 
 
@@ -571,7 +598,7 @@ def _dynamic_source_findings(
                 evidence=raw,
             )
         ]
-    maximum = max(abs(level) for level in levels if level is not None)
+    maximum = max(level.copy_abs() for level in levels if level is not None)
     if maximum <= Decimal(str(configured_limit)):
         return []
     return [
@@ -687,7 +714,7 @@ def _source_conflicts(context: CheckContext) -> list[Finding]:
             if value is None:
                 continue
             p, n = (node.lower() for node in voltage_source.element.nodes[:2])
-            values.add(value if p <= n else -value)
+            values.add(value if p <= n else value.copy_negate())
         if len(values) > 1:
             first_source = min(sources, key=lambda item: item.element.name.lower())
             findings.append(
@@ -706,17 +733,116 @@ def _source_conflicts(context: CheckContext) -> list[Finding]:
     return findings
 
 
+def _static_literal_voltage(device: Device) -> Decimal | None:
+    arguments = device.element.arguments
+    if device.element.parameters:
+        return None
+    token: str | None = None
+    if len(arguments) == 1:
+        token = arguments[0]
+    elif len(arguments) == 2 and arguments[0].casefold() == "dc":
+        token = arguments[1]
+    if token is None or _PURE_SPICE_NUMBER.fullmatch(token) is None:
+        return None
+    return _numeric(token)
+
+
+def _configured_net(node: str, names: set[str]) -> bool:
+    return node in names
+
+
+def _bounded_rail_name(value: str) -> str:
+    if len(value) <= _MAX_RAIL_WITNESS_NAME:
+        return value
+    return value[: _MAX_RAIL_WITNESS_NAME - 3] + "..."
+
+
+def _rail_path_evidence(
+    start: str, goal: str, ties: list[_RailTie]
+) -> tuple[int, str, tuple[str, ...], bool, SourceLocation | None]:
+    adjacency: dict[str, list[tuple[str, _RailTie]]] = defaultdict(list)
+    for tie in ties:
+        adjacency[tie.first].append((tie.second, tie))
+        adjacency[tie.second].append((tie.first, tie))
+    previous: dict[str, tuple[str, _RailTie] | None] = {start: None}
+    pending = deque([start])
+    while pending and goal not in previous:
+        node = pending.popleft()
+        for neighbour, tie in adjacency[node]:
+            if neighbour not in previous:
+                previous[neighbour] = (node, tie)
+                pending.append(neighbour)
+    if goal not in previous:  # pragma: no cover - guarded by the union proof
+        raise RuntimeError("internal rail-short proof is disconnected")
+
+    digest = sha256()
+    count = 0
+    shown: list[str] = []
+    location: SourceLocation | None = None
+    cursor = goal
+    while cursor != start:
+        step = previous[cursor]
+        if step is None:  # pragma: no cover - start is the only root marker
+            raise RuntimeError("internal rail-short proof is incomplete")
+        prior, tie = step
+        name = tie.device.qualified_name
+        family = tie.device.element.kind
+        for value in (cursor, prior, name, family):
+            encoded = value.encode("utf-8")
+            digest.update(len(encoded).to_bytes(8, "big"))
+            digest.update(encoded)
+        if len(shown) < _MAX_RAIL_WITNESS_DEVICES:
+            shown.append(_bounded_rail_name(name))
+        candidate = tie.device.element.location
+        if location is None or (candidate.path, candidate.line, candidate.column) < (
+            location.path,
+            location.line,
+            location.column,
+        ):
+            location = candidate
+        count += 1
+        cursor = prior
+    return count, digest.hexdigest(), tuple(shown), count > len(shown), location
+
+
 def _rail_short_findings(context: CheckContext) -> list[Finding]:
     findings: list[Finding] = []
     grounds = {name.lower() for name in context.policy.electrical.ground_nets} | {"0"}
     powers = {name.lower() for name in context.policy.electrical.power_nets}
+    union = _RailUnion()
+    ties: list[_RailTie] = []
+    legacy_direct: list[_RailTie] = []
     for device in _electrical_elements(context.graph):
         element = device.element
-        value = _numeric(element.value)
-        if element.kind != "R" or value != 0 or len(element.nodes) < 2:
+        if len(element.nodes) < 2:
             continue
-        nodes = {node.lower() for node in element.nodes[:2]}
-        if nodes & grounds and nodes & powers:
+        value: Decimal | None = None
+        if element.kind == "R":
+            value = _numeric(element.value)
+            proven_tie = value == 0 and not element.arguments and not element.parameters
+        elif element.kind == "L":
+            value = _numeric(element.value)
+            proven_tie = (
+                value is not None and value > 0 and not element.arguments and not element.parameters
+            )
+        elif element.kind == "V":
+            value = _static_literal_voltage(device)
+            proven_tie = value == 0
+        else:
+            proven_tie = False
+        if not proven_tie:
+            continue
+        first, second = (node.lower() for node in element.nodes[:2])
+        if first == second:
+            continue
+        tie = _RailTie(first, second, device)
+        ties.append(tie)
+        union.union(first, second)
+        if element.kind == "R" and (
+            (_configured_net(first, grounds) and _configured_net(second, powers))
+            or (_configured_net(second, grounds) and _configured_net(first, powers))
+        ):
+            legacy_direct.append(tie)
             findings.append(
                 _finding(
                     context,
@@ -729,6 +855,53 @@ def _rail_short_findings(context: CheckContext) -> list[Finding]:
                     remediation="Remove the short or correct the configured rail names.",
                 )
             )
+
+    component_nodes: dict[str, set[str]] = defaultdict(set)
+    component_ties: dict[str, list[_RailTie]] = defaultdict(list)
+    for tie in ties:
+        root = union.find(tie.first)
+        component_nodes[root].update((tie.first, tie.second))
+        component_ties[root].append(tie)
+    legacy_components = {union.find(tie.first) for tie in legacy_direct}
+    for root, nodes in sorted(component_nodes.items()):
+        if root in legacy_components:
+            continue
+        ground_nodes = sorted(node for node in nodes if _configured_net(node, grounds))
+        power_nodes = sorted(node for node in nodes if _configured_net(node, powers))
+        if not ground_nodes or not power_nodes:
+            continue
+        power, ground = power_nodes[0], ground_nodes[0]
+        count, proof, witness, truncated, location = _rail_path_evidence(
+            power, ground, component_ties[root]
+        )
+        shown_power, shown_ground = _bounded_rail_name(power), _bounded_rail_name(ground)
+        findings.append(
+            _finding(
+                context,
+                "RAIL002",
+                "Declared DC rail-short path",
+                Severity.DENY,
+                f"configured power {shown_power!r} is tied to ground {shown_ground!r} "
+                f"by {count} declared DC short element(s) (proof {proof[:12]})",
+                location,
+                evidence=" <- ".join(witness) + (" <- ..." if truncated else ""),
+                remediation=(
+                    "Break the declared DC short path or correct the configured rail names."
+                ),
+                metadata={
+                    "component_edges": len(component_ties[root]),
+                    "component_nodes": len(nodes),
+                    "ground": shown_ground,
+                    "power": shown_power,
+                    "proof_direction": "ground-to-power",
+                    "proof_profile": "static-netlist-short-intent-v1",
+                    "proof_elements": count,
+                    "proof_sha256": proof,
+                    "witness_devices": witness,
+                    "witness_truncated": truncated,
+                },
+            )
+        )
     return findings
 
 

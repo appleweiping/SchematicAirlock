@@ -1,0 +1,8 @@
+Parameter precedence oracle: top dependency after later override
+.param a=0 b={a}
+.param a=1
+IIN 0 n DC 1
+RPATH n 0 {b}
+.op
+.print op v(n)
+.end

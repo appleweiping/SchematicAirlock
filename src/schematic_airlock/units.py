@@ -4,13 +4,25 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from decimal import Decimal, DivisionByZero, InvalidOperation, localcontext
+from decimal import (
+    ROUND_HALF_EVEN,
+    Context,
+    Decimal,
+    DecimalException,
+    DivisionByZero,
+    Inexact,
+    InvalidOperation,
+    Overflow,
+    Underflow,
+    localcontext,
+)
 
 from schematic_airlock.domain import InputError
 
 _NUMBER = re.compile(
     r"(?P<number>[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)"
-    r"(?P<suffix>[A-Za-z]*)"
+    r"(?P<suffix>[A-Za-z]*)",
+    re.ASCII,
 )
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_.$]*")
 _MULTIPLIERS: tuple[tuple[str, Decimal], ...] = (
@@ -27,12 +39,40 @@ _MULTIPLIERS: tuple[tuple[str, Decimal], ...] = (
 )
 _UNIT_ONLY = ("v", "a", "ohm", "hz", "s", "h", "w")
 _MAX_MAGNITUDE = Decimal("1e100")
+_MIN_MAGNITUDE = Decimal("1e-100")
+_MAX_DIGITS = 1_024
+_CONTEXT = Context(
+    prec=_MAX_DIGITS + 4,
+    rounding=ROUND_HALF_EVEN,
+    Emin=-1_000,
+    Emax=1_000,
+    traps=[InvalidOperation, DivisionByZero, Overflow, Underflow],
+)
+
+
+def _supported(value: Decimal) -> Decimal:
+    # copy_abs() and Decimal comparisons do not round through the caller's
+    # context. Check before fixed-point formatting or subsequent arithmetic.
+    if not isinstance(value, Decimal) or not value.is_finite():
+        raise ValueError("numeric value must be a finite Decimal")
+    magnitude = value.copy_abs()
+    if (
+        len(value.as_tuple().digits) > _MAX_DIGITS
+        or magnitude > _MAX_MAGNITUDE
+        or (magnitude != 0 and magnitude < _MIN_MAGNITUDE)
+    ):
+        raise ValueError("numeric value is outside the supported finite range or digit budget")
+    return value
 
 
 def parse_number(text: str) -> Decimal:
     """Parse a finite SPICE number without applying Python evaluation rules."""
 
-    candidate = text.strip().strip("{}'")
+    if not isinstance(text, str) or len(text) > _MAX_DIGITS:
+        raise ValueError("SPICE literal exceeds the 1024-character budget")
+    candidate = text.strip()
+    if len(candidate) >= 2 and (candidate[0], candidate[-1]) in (("{", "}"), ("'", "'")):
+        candidate = candidate[1:-1]
     match = _NUMBER.fullmatch(candidate)
     if match is None:
         raise ValueError(f"not a SPICE number: {text!r}")
@@ -49,12 +89,12 @@ def parse_number(text: str) -> Decimal:
             raise ValueError(f"unknown SPICE suffix in {text!r}")
 
     try:
-        value = Decimal(match.group("number")) * multiplier
-    except InvalidOperation as exc:
+        with localcontext(_CONTEXT) as context:
+            context.traps[Inexact] = True
+            value = Decimal(match.group("number")) * multiplier
+    except DecimalException as exc:
         raise ValueError(f"invalid SPICE number: {text!r}") from exc
-    if not value.is_finite() or abs(value) > _MAX_MAGNITUDE:
-        raise ValueError(f"SPICE number is outside the supported finite range: {text!r}")
-    return value
+    return _supported(value)
 
 
 def _expression_tokens(expression: str, max_tokens: int) -> list[str]:
@@ -96,23 +136,27 @@ class _ExpressionParser:
         tokens: Sequence[str],
         parameters: Mapping[str, Decimal],
         max_depth: int,
+        exact: bool,
     ) -> None:
         self.tokens = tokens
         self.parameters = {name.lower(): value for name, value in parameters.items()}
         self.max_depth = max_depth
         self.index = 0
+        self.exact = exact
 
     def parse(self) -> Decimal:
         if not self.tokens:
             raise ValueError("expression is empty")
-        with localcontext() as context:
-            context.prec = 50
-            value = self._sum(0)
+        try:
+            with localcontext(_CONTEXT) as context:
+                context.prec = _MAX_DIGITS if self.exact else 50
+                context.traps[Inexact] = self.exact
+                value = self._sum(0)
+        except DecimalException as exc:
+            raise ValueError("expression is inexact or exceeds the arithmetic range") from exc
         if self.index != len(self.tokens):
             raise ValueError(f"unexpected token {self.tokens[self.index]!r}")
-        if not value.is_finite() or abs(value) > _MAX_MAGNITUDE:
-            raise ValueError("expression result is outside the supported finite range")
-        return value
+        return _supported(value)
 
     def _sum(self, depth: int) -> Decimal:
         value = self._product(depth + 1)
@@ -174,34 +218,79 @@ def evaluate_expression(
     *,
     max_tokens: int = 128,
     max_depth: int = 32,
+    exact: bool = False,
 ) -> Decimal:
     """Evaluate the supported arithmetic subset with explicit resource limits."""
 
+    if not isinstance(expression, str) or len(expression) > 16_384:
+        raise ValueError("expression exceeds the 16384-character budget")
+    if type(max_tokens) is not int or not 1 <= max_tokens <= 128:
+        raise ValueError("token budget must be an integer between 1 and 128")
+    if type(max_depth) is not int or not 1 <= max_depth <= 32:
+        raise ValueError("depth budget must be an integer between 1 and 32")
+    if type(exact) is not bool:
+        raise ValueError("exact must be a bool")
+    _validate_parameters(parameters)
     tokens = _expression_tokens(expression, max_tokens)
-    return _ExpressionParser(tokens, parameters or {}, max_depth).parse()
+    return _ExpressionParser(tokens, parameters or {}, max_depth, exact).parse()
+
+
+def _validate_parameters(parameters: Mapping[str, Decimal] | None) -> None:
+    if parameters is None:
+        return
+    if not isinstance(parameters, Mapping) or len(parameters) > 128:
+        raise ValueError("parameters must be a mapping of at most 128 values")
+    for name, value in parameters.items():
+        if not isinstance(name, str) or len(name) > 1_024 or _NAME.fullmatch(name) is None:
+            raise ValueError("invalid expression parameter name")
+        _supported(value)
 
 
 def parameter_assignments(
     tokens: Sequence[str],
     inherited: Mapping[str, Decimal] | None = None,
+    *,
+    exact: bool = False,
 ) -> dict[str, Decimal]:
     """Evaluate ``name=value`` tokens from left to right."""
 
+    if isinstance(tokens, str | bytes) or not isinstance(tokens, Sequence) or len(tokens) > 128:
+        raise ValueError("parameter assignments require a sequence of at most 128 tokens")
+    if type(exact) is not bool:
+        raise ValueError("exact must be a bool")
+    _validate_parameters(inherited)
+    names = {name.lower() for name in inherited or {}}
+    for token in tokens:
+        name, _expression = parameter_assignment_parts(token)
+        names.add(name.lower())
+        if len(names) > 128:
+            raise ValueError("parameter assignments support at most 128 distinct names")
     values = {name.lower(): value for name, value in (inherited or {}).items()}
     for token in tokens:
-        if "=" not in token:
-            continue
         name, expression = token.split("=", 1)
-        if _NAME.fullmatch(name) is None:
-            raise InputError(f"invalid parameter name {name!r}")
-        values[name.lower()] = evaluate_expression(expression, values)
+        values[name.lower()] = evaluate_expression(expression, values, exact=exact)
     return values
+
+
+def parameter_assignment_parts(token: str) -> tuple[str, str]:
+    """Validate declaration syntax without evaluating or consulting a scope."""
+    if not isinstance(token, str) or len(token) > 17_409:
+        raise ValueError("parameter assignment token must be bounded text")
+    if "=" not in token:
+        raise ValueError("parameter assignment requires name=value")
+    name, expression = token.split("=", 1)
+    if len(name) > 1_024 or _NAME.fullmatch(name) is None:
+        raise InputError(f"invalid parameter name {name[:80]!r}")
+    if not expression or len(expression) > 16_384:
+        raise ValueError("parameter assignment expression must be bounded nonempty text")
+    return name, expression
 
 
 def decimal_text(value: Decimal) -> str:
     """Return a stable, non-exponential representation where practical."""
 
-    normalized = value.normalize()
-    if normalized == normalized.to_integral():
-        return str(normalized.quantize(Decimal(1)))
-    return format(normalized, "f").rstrip("0").rstrip(".")
+    _supported(value)
+    if value == 0:
+        return "0"
+    rendered = format(value, "f")
+    return rendered.rstrip("0").rstrip(".") if "." in rendered else rendered

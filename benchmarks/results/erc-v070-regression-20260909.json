@@ -1,0 +1,17 @@
+{
+  "decks_per_iteration": 2,
+  "devices_per_iteration": 23,
+  "distribution_version": "0.7.0",
+  "findings_per_iteration": 0,
+  "harness_sha256": "2c384895d489fbf9df6afbf8a0b51e9a482dc714f2b41caa51065cd878e0efbb",
+  "iterations": 25,
+  "median_ms": 98.2403,
+  "minimum_ms": 83.9236,
+  "package_tree_sha256": "e3058f08dcaf4d3b97ff6c7e0f584b5c987545faf287a4a88ab28766db546e18",
+  "schema_version": 1,
+  "tool": "SchematicAirlock",
+  "verification_findings_per_iteration": 1,
+  "verification_lineage_records_per_iteration": 4,
+  "verification_workload_sha256": "fdd7bafc1ae8e74634d74d1ab5589e4f2972c064410830c3dc8ffc4ad2581b40",
+  "workload_sha256": "18d346fa7e641cd78b094985ec156e9b407253cd622c0c7d929b7285bd0e9cde"
+}

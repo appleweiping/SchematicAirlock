@@ -1,0 +1,7 @@
+RAIL oracle: two literal zero resistors
+IIN 0 n DC 1
+RLEFT n mid 0
+RRIGHT mid 0 0
+.op
+.print op v(n) v(mid)
+.end

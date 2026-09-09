@@ -1,0 +1,8 @@
+RAIL oracle: dynamic source has a nonzero future value
+VDYNAMIC n 0 PULSE(0 1 1u 1n 1n 1u 3u)
+RLOAD n 0 1k
+.op
+.tran 10n 2u
+.measure tran maximum MAX v(n)
+.print op v(n)
+.end

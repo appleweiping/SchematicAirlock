@@ -1,0 +1,444 @@
+{
+  "schema": "org.schematic-airlock.erc-regression-corpus",
+  "version": 1,
+  "description": "Original, manifest-driven electrical-rule boundary corpus for SchematicAirlock.",
+  "electrical_rule_inventory": [
+    "ELEM001",
+    "ELEM002",
+    "NET001",
+    "NET002",
+    "PORT001",
+    "PORT002",
+    "RAIL001",
+    "RAIL002",
+    "SOLVE001",
+    "SOLVE002",
+    "SOLVE003",
+    "SRC001",
+    "VAL001",
+    "VAL002",
+    "VOLT001",
+    "VOLT002"
+  ],
+  "device_family_inventory": [
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "L",
+    "M",
+    "Q",
+    "R",
+    "V",
+    "X",
+    "Z"
+  ],
+  "voltage_status_inventory": [
+    "inconsistent",
+    "indeterminate",
+    "pass",
+    "possible-violation",
+    "violation"
+  ],
+  "cases": [
+    {
+      "id": "audit-safe-all-recognized-families",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "safe_all_families.sp",
+      "boundary": "negative",
+      "physical_explanation": "Every recognized primitive family is connected to a grounded, bounded reference network, so no electrical finding is expected.",
+      "expected_decision": "allow",
+      "expected_rule_ids": [],
+      "expected_severities": {}
+    },
+    {
+      "id": "audit-dependent-voltage-sources-have-reference",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "dependent_voltage_referenced.sp",
+      "boundary": "negative",
+      "physical_explanation": "Voltage-controlled and current-controlled voltage sources constrain their output node voltage and therefore provide a DC reference here.",
+      "expected_decision": "allow",
+      "expected_rule_ids": [],
+      "expected_severities": {}
+    },
+    {
+      "id": "audit-near-zero-resistor-is-not-a-short",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "rail_near_zero_safe.sp",
+      "boundary": "negative",
+      "physical_explanation": "One milliohm is small but nonzero, so the resistor must not be promoted to a proven zero-voltage rail-to-ground connection.",
+      "expected_decision": "allow",
+      "expected_rule_ids": [],
+      "expected_severities": {},
+      "forbidden_rule_ids": ["RAIL001", "RAIL002"]
+    },
+    {
+      "id": "audit-behavioral-source",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "behavioral_source.sp",
+      "boundary": "positive",
+      "physical_explanation": "A behavioral voltage expression can execute simulator-specific semantics that the bounded primitive checker deliberately does not evaluate.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["ELEM002"],
+      "expected_severities": {"ELEM002": "deny"}
+    },
+    {
+      "id": "audit-unknown-element-family",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "unknown_element.sp",
+      "boundary": "indeterminate",
+      "physical_explanation": "An unknown Z-family record has no trusted terminal or device semantics, so the artifact requires engineering review rather than an invented model.",
+      "expected_decision": "review",
+      "expected_rule_ids": ["ELEM001"],
+      "expected_severities": {"ELEM001": "review"}
+    },
+    {
+      "id": "audit-negative-passive",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "passive_nonphysical.sp",
+      "boundary": "positive",
+      "physical_explanation": "A negative literal inductance violates the passive-value contract even though its surrounding network has a valid ground reference.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["VAL001"],
+      "expected_severities": {"VAL001": "deny"}
+    },
+    {
+      "id": "audit-unresolved-passive",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "passive_unknown.sp",
+      "boundary": "indeterminate",
+      "physical_explanation": "An unresolved resistance cannot be classified as positive, negative, or zero, so its physical value remains review-only.",
+      "expected_decision": "review",
+      "expected_rule_ids": ["VAL002"],
+      "expected_severities": {"VAL002": "review"}
+    },
+    {
+      "id": "audit-static-source-over-policy",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "source_over_limit.sp",
+      "boundary": "positive",
+      "physical_explanation": "The independent 25 V literal source exceeds the default absolute 20 V artifact ceiling and is therefore a definite policy violation.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["VOLT001"],
+      "expected_severities": {"VOLT001": "deny"}
+    },
+    {
+      "id": "audit-dynamic-source-unbounded",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "source_dynamic_unknown.sp",
+      "boundary": "indeterminate",
+      "physical_explanation": "The TABLE waveform is not assigned a static voltage bound by this parser, so the checker must request review rather than assume zero.",
+      "expected_decision": "review",
+      "expected_rule_ids": ["VOLT002"],
+      "expected_severities": {"VOLT002": "review"}
+    },
+    {
+      "id": "audit-required-output-missing",
+      "runner": "audit",
+      "bundle": "ports",
+      "entry": "missing_output.sp",
+      "boundary": "positive",
+      "physical_explanation": "The bundle declares an output named out, but no circuit terminal uses that net, so the declared external interface is incomplete.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["PORT001"],
+      "expected_severities": {"PORT001": "deny"}
+    },
+    {
+      "id": "audit-output-capacitive-only",
+      "runner": "audit",
+      "bundle": "ports",
+      "entry": "undriven_output.sp",
+      "boundary": "positive",
+      "physical_explanation": "The declared output reaches only a capacitor and insulated MOS gate, leaving both its drive intent and its DC operating point unresolved.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["PORT002", "SOLVE002"],
+      "expected_severities": {"PORT002": "review", "SOLVE002": "deny"}
+    },
+    {
+      "id": "audit-single-terminal-internal-net",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "dangling_internal.sp",
+      "boundary": "indeterminate",
+      "physical_explanation": "The spur net has only one device terminal; it remains DC-referenced but is likely an accidental dangling connection requiring review.",
+      "expected_decision": "review",
+      "expected_rule_ids": ["NET001"],
+      "expected_severities": {"NET001": "review"}
+    },
+    {
+      "id": "audit-floating-mos-gate",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "floating_gate.sp",
+      "boundary": "positive",
+      "physical_explanation": "The MOS gate reaches ground only through a capacitor, so it has neither evident DC drive nor a conducting DC reference path.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["NET002", "SOLVE002"],
+      "expected_severities": {"NET002": "deny", "SOLVE002": "deny"}
+    },
+    {
+      "id": "audit-conflicting-parallel-sources",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "conflicting_sources.sp",
+      "boundary": "positive",
+      "physical_explanation": "Two ideal sources impose different exact voltages across the same node pair, which is both a direct source conflict and an ideal-source loop.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["SOLVE003", "SRC001"],
+      "expected_severities": {"SOLVE003": "deny", "SRC001": "deny"}
+    },
+    {
+      "id": "audit-direct-zero-ohm-rail-short",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "direct_rail_short.sp",
+      "boundary": "positive",
+      "physical_explanation": "One declared zero-ohm resistor directly joins configured power and ground, preserving the component-local RAIL001 intent rule without asserting simulator regularization.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["RAIL001"],
+      "expected_severities": {"RAIL001": "deny"},
+      "forbidden_rule_ids": ["RAIL002"]
+    },
+    {
+      "id": "audit-chained-zero-ohm-rail-short",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "chained_rail_short.sp",
+      "boundary": "positive",
+      "physical_explanation": "Two declared zero-ohm resistors connect power to ground through an internal node, proving a composite short-intent path without asserting simulator regularization.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["RAIL002"],
+      "expected_severities": {"RAIL002": "deny"},
+      "forbidden_rule_ids": ["RAIL001"]
+    },
+    {
+      "id": "audit-zero-volt-source-rail-short",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "zero_voltage_source_short.sp",
+      "boundary": "positive",
+      "physical_explanation": "A static independent zero-volt source fixes zero voltage difference between configured power and ground and therefore proves a DC short path.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["RAIL002"],
+      "expected_severities": {"RAIL002": "deny"},
+      "forbidden_rule_ids": ["RAIL001"]
+    },
+    {
+      "id": "audit-positive-inductor-rail-short",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "inductor_dc_short.sp",
+      "boundary": "positive",
+      "physical_explanation": "A valid positive ideal inductor has zero steady-state voltage in the DC topology and directly connects the configured rails.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["RAIL002"],
+      "expected_severities": {"RAIL002": "deny"},
+      "forbidden_rule_ids": ["RAIL001"]
+    },
+    {
+      "id": "audit-no-ground-reference",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "no_ground_reference.sp",
+      "boundary": "indeterminate",
+      "physical_explanation": "A two-node resistor fragment never names any configured ground, so it may be an incomplete block or use an undeclared reference convention.",
+      "expected_decision": "review",
+      "expected_rule_ids": ["SOLVE001"],
+      "expected_severities": {"SOLVE001": "review"}
+    },
+    {
+      "id": "audit-capacitive-dc-island",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "capacitive_island.sp",
+      "boundary": "positive",
+      "physical_explanation": "A capacitor is open at DC, so the resistor loop behind it remains a floating island despite having an AC coupling path to a referenced rail.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["SOLVE002"],
+      "expected_severities": {"SOLVE002": "deny"}
+    },
+    {
+      "id": "audit-dependent-current-output-floating",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "dependent_current_floating.sp",
+      "boundary": "positive",
+      "physical_explanation": "Controlled current sources prescribe current but not output voltage, so their shared output still lacks a DC voltage reference.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["SOLVE002"],
+      "expected_severities": {"SOLVE002": "deny"}
+    },
+    {
+      "id": "audit-three-source-loop",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "source_triangle.sp",
+      "boundary": "positive",
+      "physical_explanation": "Three ideal sources close a voltage-source-only triangle even though no two sources are parallel across the same node pair.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["SOLVE003"],
+      "expected_severities": {"SOLVE003": "deny"}
+    },
+    {
+      "id": "audit-hierarchical-instance-parameter",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "hierarchy_instance_override.sp",
+      "boundary": "positive",
+      "physical_explanation": "A reached subcircuit instance overrides its safe default source level, and the expanded 30 V value must be checked in the caller context.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["VOLT001"],
+      "expected_severities": {"VOLT001": "deny"}
+    },
+    {
+      "id": "audit-disabled-text-and-unreachable-definition",
+      "runner": "audit",
+      "bundle": "audit",
+      "entry": "disabled_and_unreachable.sp",
+      "boundary": "positive",
+      "physical_explanation": "A commented 200 V source is inert, while a live excessive source inside an unreachable definition remains visible to static artifact checks and the definition is reported unreachable.",
+      "expected_decision": "deny",
+      "expected_rule_ids": ["GRAPH006", "VOLT001"],
+      "expected_severities": {"GRAPH006": "review", "VOLT001": "deny"}
+    },
+    {
+      "id": "voltage-rated-mos-and-diode-safe",
+      "runner": "voltage",
+      "bundle": "voltage",
+      "entry": "rated_devices_safe.sp",
+      "boundary": "negative",
+      "physical_explanation": "Exact source constraints place every explicitly rated MOS terminal pair and the diode anode-to-cathode voltage inside its declared interval.",
+      "rules": {
+        "schema": "org.schematic-airlock.voltage-rules",
+        "version": 1,
+        "models": {
+          "clampdiode": {
+            "kind": "D",
+            "limits": {"ak": {"min": "-2", "max": "2"}}
+          },
+          "coremos": {
+            "kind": "M",
+            "limits": {
+              "bd": {"min": "-2", "max": "2"},
+              "bs": {"min": "-2", "max": "2"},
+              "ds": {"min": "-2", "max": "2"},
+              "gb": {"min": "-2", "max": "2"},
+              "gd": {"min": "-2", "max": "2"},
+              "gs": {"min": "-2", "max": "2"}
+            }
+          }
+        }
+      },
+      "expected_status": "pass",
+      "expected_checks": {
+        "device:top/dclamp:ak": "pass",
+        "device:top/mcore:bd": "pass",
+        "device:top/mcore:bs": "pass",
+        "device:top/mcore:ds": "pass",
+        "device:top/mcore:gb": "pass",
+        "device:top/mcore:gd": "pass",
+        "device:top/mcore:gs": "pass"
+      }
+    },
+    {
+      "id": "voltage-rated-mos-definite-violation",
+      "runner": "voltage",
+      "bundle": "voltage",
+      "entry": "rated_device_violation.sp",
+      "boundary": "positive",
+      "physical_explanation": "Exact drain and gate supplies put five MOS terminal differences outside deliberately narrow half-volt limits, making the violation definite.",
+      "rules": {
+        "schema": "org.schematic-airlock.voltage-rules",
+        "version": 1,
+        "models": {
+          "narrowmos": {
+            "kind": "M",
+            "limits": {
+              "bd": {"min": "-0.5", "max": "0.5"},
+              "bs": {"min": "-0.5", "max": "0.5"},
+              "ds": {"min": "-0.5", "max": "0.5"},
+              "gb": {"min": "-0.5", "max": "0.5"},
+              "gd": {"min": "-0.5", "max": "0.5"},
+              "gs": {"min": "-0.5", "max": "0.5"}
+            }
+          }
+        }
+      },
+      "expected_status": "violation",
+      "expected_checks": {
+        "device:top/mcore:bd": "violation",
+        "device:top/mcore:bs": "pass",
+        "device:top/mcore:ds": "violation",
+        "device:top/mcore:gb": "violation",
+        "device:top/mcore:gd": "violation",
+        "device:top/mcore:gs": "violation"
+      }
+    },
+    {
+      "id": "voltage-source-envelope-overlaps-limit",
+      "runner": "voltage",
+      "bundle": "voltage",
+      "entry": "source_envelope_overlap.sp",
+      "boundary": "indeterminate",
+      "physical_explanation": "The declared source sweep from 1 V to 2 V overlaps but is not contained by the allowed 1.5 V to 1.7 V observation window.",
+      "rules": {
+        "schema": "org.schematic-airlock.voltage-rules",
+        "version": 1,
+        "source_envelopes": {"top/vsupply": {"min": "1", "max": "2"}},
+        "expected": [
+          {"name": "rail_window", "positive": "rail", "negative": "0", "min": "1.5", "max": "1.7"}
+        ]
+      },
+      "expected_status": "possible-violation",
+      "expected_checks": {"expected:rail_window": "possible-violation"}
+    },
+    {
+      "id": "voltage-resistive-drop-unassessed",
+      "runner": "voltage",
+      "bundle": "voltage",
+      "entry": "resistive_drop_unknown.sp",
+      "boundary": "indeterminate",
+      "physical_explanation": "Without a current or load equation, a nonzero resistor does not determine the downstream sense-node voltage, so the requested interval remains unknown.",
+      "rules": {
+        "schema": "org.schematic-airlock.voltage-rules",
+        "version": 1,
+        "expected": [
+          {"name": "sense_window", "positive": "sense", "negative": "0", "min": "0", "max": "2"}
+        ]
+      },
+      "expected_status": "indeterminate",
+      "expected_checks": {"expected:sense_window": "indeterminate"}
+    },
+    {
+      "id": "voltage-inconsistent-nominal-sources",
+      "runner": "voltage",
+      "bundle": "voltage",
+      "entry": "inconsistent_sources.sp",
+      "boundary": "positive",
+      "physical_explanation": "Two nominal ideal sources require different exact voltages on the same rail, so the literal constraint system is inconsistent before any rating is assessed.",
+      "rules": {
+        "schema": "org.schematic-airlock.voltage-rules",
+        "version": 1,
+        "expected": [
+          {"name": "rail_window", "positive": "rail", "negative": "0", "min": "1", "max": "2"}
+        ]
+      },
+      "expected_status": "inconsistent",
+      "expected_checks": {},
+      "expected_note_fragments": ["incompatible exact voltage difference"]
+    }
+  ]
+}

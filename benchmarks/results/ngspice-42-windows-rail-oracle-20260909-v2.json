@@ -1,0 +1,581 @@
+{
+  "cases": [
+    {
+      "case": "l-model.cir",
+      "case_bytes": 158,
+      "case_sha256": "7cacbcab98a3aa690e91d55fd94d14295afe95d9f955ad36586ba6a0e1920b27",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "l-model.cir"
+      ],
+      "exit_code": 1,
+      "log": {
+        "bytes": 335,
+        "sha256": "89869e8fd1211478b4625ee3d1c33b5ae203f76ca136b3287eeac3ce69fb0843"
+      },
+      "observation": {
+        "simulation": "rejected",
+        "unknown_parameter": "inductor_model"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "l-positive.cir",
+      "case_bytes": 93,
+      "case_sha256": "3756d003cde8b365bbf7abc2bd0c56cbef968ac038a62a5feaf1a397b1616d36",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "l-positive.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2261,
+        "sha256": "61ebbfb988ee5717fbb890808433e307c02e5b90e4a1a79ef2ff7972d7025cce"
+      },
+      "observation": {
+        "op_v_n_volts": "0.000000e+00"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "l-rser-unknown.cir",
+      "case_bytes": 133,
+      "case_sha256": "7a69dfdfe3ad42e3238e3a8dba240702165c01be64f73077e77610c1da891771",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "l-rser-unknown.cir"
+      ],
+      "exit_code": 1,
+      "log": {
+        "bytes": 334,
+        "sha256": "e229e2aedde6a24fd4f6fedd787409acd5cd8f75fddd60540ab7d7ad4df22752"
+      },
+      "observation": {
+        "simulation": "rejected",
+        "unknown_parameter": "rser"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "l-zero-multiplier.cir",
+      "case_bytes": 100,
+      "case_sha256": "6bfa07788d752d110b96dd4002b5229668ca2f940bf164e870cee795d4270a79",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "l-zero-multiplier.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2267,
+        "sha256": "cb4132226326c712ecd78143ed8b8a39632b91b388f759a27839ada6e533a816"
+      },
+      "observation": {
+        "op_v_n_volts": "0.000000e+00"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-all-levels.cir",
+      "case_bytes": 189,
+      "case_sha256": "b27271a0f838b64162d0b43ee94fe04d1fb84be7fe1fc9d88110c8dcde57983b",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-all-levels.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2490,
+        "sha256": "cb76bdf8154113a058c517c1be212b79f798d6279cc7c7ad9612a0fd6111723e"
+      },
+      "observation": {
+        "op_v_n_volts": "4.000000e+00",
+        "reported_resistance_ohms": "4",
+        "scope_boundary": "instance-over-body-header-global"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-body-dependent.cir",
+      "case_bytes": 190,
+      "case_sha256": "b8c77d8a41f96d02228580635a7c81bb5058d506359221979e774ddbcc64e775",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-body-dependent.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2502,
+        "sha256": "b601668ba7e8f320ae04a928f2fbb914950d508d116af6319092bbde8a99c896"
+      },
+      "observation": {
+        "op_v_n_volts": "5.000000e+00",
+        "reported_resistance_ohms": "5",
+        "scope_boundary": "body-derived-sees-instance"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-body-shadowed.cir",
+      "case_bytes": 185,
+      "case_sha256": "df74cd68554d79592375a546bebdf214802b20c811f31fdb46c8589f7599a982",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-body-shadowed.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2498,
+        "sha256": "fa5026363ef98bb01ad8cc6b36b90a6a4cb93280b6efb343b34e0c8b6c1a9162"
+      },
+      "observation": {
+        "op_v_n_volts": "1.000000e+00",
+        "reported_resistance_ohms": "1",
+        "scope_boundary": "instance-over-body"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-global-only.cir",
+      "case_bytes": 143,
+      "case_sha256": "330d411f8183060c5df9ee3e2397f740c381f80fdd81592aaf2bb30a648300f0",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-global-only.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2476,
+        "sha256": "bd987a202a0c856259775084436fbcb9ef79fe4b66f329be9d685067b483a74d"
+      },
+      "observation": {
+        "op_v_n_volts": "1.000000e+00",
+        "reported_resistance_ohms": "1",
+        "scope_boundary": "global-value"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-header-dependent.cir",
+      "case_bytes": 185,
+      "case_sha256": "dfbf90839dc62af49c4a6c9aa77d66b09cd68edee651efaeb818fac800e7ce58",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-header-dependent.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2504,
+        "sha256": "0a785a469a16b6af25358d0388ae65bcf84646f41716ecb0d6f43204138b755e"
+      },
+      "observation": {
+        "op_v_n_volts": "5.000000e+00",
+        "reported_resistance_ohms": "5",
+        "scope_boundary": "header-derived-sees-instance"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-no-body.cir",
+      "case_bytes": 166,
+      "case_sha256": "c941f79e3e8fff29601a0b0a1325a67e800b7f4946822317fcca899b1666add2",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-no-body.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2482,
+        "sha256": "4b155cee365b733b7acdd30e5a9a17ab94ca514bcaee26c7d2eca6cd3a24075f"
+      },
+      "observation": {
+        "op_v_n_volts": "2.000000e+00",
+        "reported_resistance_ohms": "2",
+        "scope_boundary": "header-over-global"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-no-header.cir",
+      "case_bytes": 161,
+      "case_sha256": "3a217d38b419899ca3ce3b7d3408906934d5bb8e1d88520d095aaf57fe98dfd4",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-no-header.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2478,
+        "sha256": "e75b7c22f9e3b84ce1f3972ef0426dc3e6ef72b6ff491b9151838adc900a7ada"
+      },
+      "observation": {
+        "op_v_n_volts": "3.000000e+00",
+        "reported_resistance_ohms": "3",
+        "scope_boundary": "body-over-global"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-no-instance.cir",
+      "case_bytes": 175,
+      "case_sha256": "bf077072f6a715badbc5b371414708cbea50e71da99b1ece0a51679522fd881c",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-no-instance.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2484,
+        "sha256": "37f9add7819a823445724faa406a44fd00433934d03c66069d06547d7da74ae5"
+      },
+      "observation": {
+        "op_v_n_volts": "3.000000e+00",
+        "reported_resistance_ohms": "3",
+        "scope_boundary": "body-over-header-global"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "parameter-top-dependent-redefined.cir",
+      "case_bytes": 144,
+      "case_sha256": "cead497a034efc85b9cba72bb42750bc0317717dc33575edf509ad2d47c93a0c",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "parameter-top-dependent-redefined.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2500,
+        "sha256": "351b325ea61054831397de618be62ef4bf3224a09725e452a743ee2d35ce1b1d"
+      },
+      "observation": {
+        "op_v_n_volts": "1.000000e+00",
+        "reported_resistance_ohms": "1",
+        "scope_boundary": "top-derived-recomputed-after-final-override"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "r-one-milliohm.cir",
+      "case_bytes": 85,
+      "case_sha256": "40f6fc17a74af7e666f1b05f909ab1c27c560d57c0b8fe8dcdefcd70ae172f93",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "r-one-milliohm.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2470,
+        "sha256": "5d11946e5f20a233f303ff660cef1e890607b10692ac9736523539fbba518e42"
+      },
+      "observation": {
+        "op_v_n_volts": "1.000000e-03",
+        "reported_resistance_ohms": "0.001"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "r-zero-chain.cir",
+      "case_bytes": 113,
+      "case_sha256": "cac3630db721ab166c50c7cf55ddb794e524478658a7f75752415f9c6813a515",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "r-zero-chain.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2786,
+        "sha256": "93fc86594d29ed7483c8a82012d5d9b0bcd9c96469f3bd09a0b71829df202df7"
+      },
+      "observation": {
+        "op_v_mid_volts": "1.000000e-03",
+        "op_v_n_volts": "2.000000e-03",
+        "reported_resistance_each_ohms": "0.001"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "r-zero.cir",
+      "case_bytes": 84,
+      "case_sha256": "66172d6a8ce8c350b6d7697ba22a5ca6b1b8499a851e34c86efa943967cedeb9",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "r-zero.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2470,
+        "sha256": "2bbd7e608b0e3b43bff6650f751f8f1442d4fb827984b98bfef1ddc03bd2321a"
+      },
+      "observation": {
+        "op_v_n_volts": "1.000000e-03",
+        "reported_resistance_ohms": "0.001"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "v-dynamic.cir",
+      "case_bytes": 175,
+      "case_sha256": "2515122c160a21065fcc42a8a25c393867a910aecb9c0633a4183cd8bf7742ba",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "v-dynamic.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 4764,
+        "sha256": "c63498efdc7727e26ed1c02bffb111a4cecd78d1d0b210294dcf02f8985bbec9"
+      },
+      "observation": {
+        "op_v_n_volts": "0.000000e+00",
+        "tran_max_v_n_volts": "1.000000e+00"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    },
+    {
+      "case": "v-zero.cir",
+      "case_bytes": 97,
+      "case_sha256": "494fbae55021581a399f46360e5921f73133c55844884d7754730a438d0ae31a",
+      "command": [
+        "ngspice",
+        "-n",
+        "-b",
+        "-o",
+        "ngspice.log",
+        "v-zero.cir"
+      ],
+      "exit_code": 0,
+      "log": {
+        "bytes": 2163,
+        "sha256": "507e9c3b7b0a93dcec705acea76f669d345f8d96b226864a605e89a33c39d2dd"
+      },
+      "observation": {
+        "op_v_n_volts": "0.000000e+00"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stdout": {
+        "bytes": 522,
+        "sha256": "4b20cd0bcbba68cfacf776b6a8a2c9514b0530a88145bc95807001c649dac3df"
+      }
+    }
+  ],
+  "distribution_archive": {
+    "bytes": 7923451,
+    "name": "ngspice-42_64.7z",
+    "sha256": "aa98b3c74743260a38835bd2698f58221b7237939798d1fdf2297f44ecf1d6ec"
+  },
+  "evidence_class": "real-executable",
+  "harness_sha256": "8593fd52d30aed6733756d6cd80078e3f339b5ff0ccc6c6d8d30ca0c6a4dfb21",
+  "limits": {
+    "archive_bytes": 134217728,
+    "case_bytes": 4096,
+    "executable_bytes": 67108864,
+    "output_bytes_per_file": 1048576,
+    "wall_seconds_per_process": 30.0
+  },
+  "passed": true,
+  "platform": {
+    "architecture": "AMD64",
+    "implementation": "CPython",
+    "operating_system": "Windows",
+    "python": "3.11.2",
+    "release": "10"
+  },
+  "schema": "org.schematic-airlock.ngspice-rail-oracle",
+  "schema_version": 1,
+  "simulator": {
+    "binary_bytes": 7474176,
+    "binary_sha256": "f86062f3bb1016dcf1552a57f38954891b4e71aee6defbebde6de589ee55682f",
+    "expected_version": "42",
+    "version_output_sha256": "13b170a1399140f4899c16941612d00bcb3761b67d0e651ed26aeef321504748"
+  }
+}

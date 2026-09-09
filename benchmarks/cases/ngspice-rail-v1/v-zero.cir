@@ -1,0 +1,6 @@
+RAIL oracle: static literal zero-volt source
+IIN 0 n DC 1
+VPATH n 0 DC 0
+.op
+.print op v(n)
+.end

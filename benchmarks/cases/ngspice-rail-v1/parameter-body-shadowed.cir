@@ -1,0 +1,10 @@
+Parameter precedence oracle: instance overrides repeated body name
+IIN 0 n DC 1
+X1 n 0 cell a=1
+.subckt cell p n params: a=2
+.param a=0
+RPATH p n {a}
+.ends cell
+.op
+.print op v(n)
+.end

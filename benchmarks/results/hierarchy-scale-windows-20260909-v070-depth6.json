@@ -1,0 +1,70 @@
+{
+  "audit_elapsed_ms": 91110.905,
+  "bundle_sha256": "ee801a679960c3a6a31d047c8acc18e831422eb0fd319badbc749517ae133e55",
+  "closed_form": {
+    "expanded_instances": 1111112,
+    "resistors": 1000000,
+    "static_devices": 62,
+    "static_nets": 14,
+    "subcircuit_calls": 111111,
+    "subcircuits": 6,
+    "voltage_sources": 1
+  },
+  "deck_bytes": 958,
+  "deck_sha256": "46b2d8ae946be44d9889e3fd6b88d7ba0483e25a4d26408e6c51d0b65714753d",
+  "harness_sha256": "a435b2d01ba3a74dc91545532a5a70e62d2b9695f53a1179a3ec0f942aedff4b",
+  "known_expected_passed": true,
+  "measurement": {
+    "memory_metric": "PeakWorkingSetSize",
+    "monitor_poll_ms": 10,
+    "peak_resident_bytes": 634798080,
+    "platform": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.2",
+    "rss_limit_bytes": 3221225472,
+    "timeout_seconds": 180,
+    "worker_executable": "C:\\Users\\admin\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+    "worker_wall_ms": 92827.99999999952
+  },
+  "observed": {
+    "bytes": 958,
+    "decision": "allow",
+    "expanded_instances": 1111112,
+    "files": 1,
+    "findings": 0,
+    "materialized_element_families": {
+      "R": 1000000,
+      "V": 1,
+      "X": 111111
+    },
+    "materialized_instances": 1111112,
+    "static_devices": 62,
+    "static_element_families": [
+      [
+        "R",
+        10
+      ],
+      [
+        "V",
+        1
+      ],
+      [
+        "X",
+        51
+      ]
+    ],
+    "static_nets": 14,
+    "subcircuits": 6
+  },
+  "policy_sha256": "a9a3ca802950c2c0fe8d6e0f7182e87bc90d3207ae67ab26bdd45d6efa3bb1f5",
+  "schema": "org.schematic-airlock.hierarchy-scale-benchmark",
+  "scope": "complete audit_path parse, hierarchy materialization, and all built-in rules for one synthetic grounded resistor hierarchy; not arbitrary million-node, nonlinear, simulator, PDK, or full-ERC performance; elapsed and RSS include one transparent post-build Counter scan that verifies the exact graph supplied to the rules",
+  "source_tree_sha256": "e3058f08dcaf4d3b97ff6c7e0f584b5c987545faf287a4a88ab28766db546e18",
+  "tool_version": "0.7.0",
+  "version": 1,
+  "workload": {
+    "depth": 6,
+    "fanout": 10,
+    "leaf_primitives": 10,
+    "profile": "parallel-grounded-resistor-hierarchy"
+  }
+}

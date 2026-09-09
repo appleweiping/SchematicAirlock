@@ -9,7 +9,7 @@ authors:
 repository-code: "https://github.com/appleweiping/SchematicAirlock"
 url: "https://github.com/appleweiping/SchematicAirlock"
 license: MIT
-version: 0.6.0
+version: 0.7.0
 date-released: 2026-09-09
 keywords:
   - SPICE

@@ -1,0 +1,6 @@
+RAIL oracle: one milliohm resistor
+IIN 0 n DC 1
+RPATH n 0 1m
+.op
+.print op v(n)
+.end
