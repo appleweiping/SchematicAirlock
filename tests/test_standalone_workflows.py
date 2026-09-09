@@ -18,9 +18,16 @@ def test_actual_standalone_workflow_command_is_import_isolated(
     body = (root / ".github/workflows" / workflow).read_text(encoding="utf-8")
     relative = f"src/schematic_airlock/{script}"
     # Exercise the actual launcher mode, not an in-process import of the helper.
-    isolated = f"python -I {relative}" in body
-    command = [sys.executable, *(["-I"] if isolated else []), str(root / relative), *arguments]
+    isolated = f"python -I -S {relative}" in body
+    command = [
+        sys.executable,
+        *(["-I", "-S"] if isolated else []),
+        str(root / relative),
+        *arguments,
+    ]
     result = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, timeout=20)
     assert result.returncode == expected, result.stderr
     assert "usage:" in result.stdout + result.stderr
-    assert isolated, "standalone trusted helpers must not import sibling or user-site modules"
+    assert isolated, (
+        "standalone trusted helpers must not import sibling, user, or system-site modules"
+    )

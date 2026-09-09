@@ -101,6 +101,8 @@ def _require(line: LogicalLine, values: list[str], count: int, description: str)
 
 def _element(line: LogicalLine, values: list[str]) -> Element:
     name = values[0]
+    if not name:
+        raise SyntaxFailure("element name must not be empty", line.location, line.evidence)
     kind = name[0].upper()
     params = _parameters(values[1:])
     positional = _positional(values)
@@ -212,6 +214,10 @@ def parse_deck(text: str, path: str) -> Deck:
                 len(tail),
             )
             positional = _positional(tail[:marker])
+            if not positional or not positional[0]:
+                raise SyntaxFailure(
+                    ".subckt requires a name before parameters", line.location, line.evidence
+                )
             current = _SubcircuitBuilder(
                 name=positional[0],
                 ports=tuple(positional[1:]),

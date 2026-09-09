@@ -37,6 +37,14 @@ def test_release_requires_main_push_ci_for_the_exact_signed_commit() -> None:
     assert release.count("verify-release") == 3
 
 
+def test_release_python_checks_use_the_required_import_isolation() -> None:
+    release = Path(".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert "python -I -S - <<'PY'" in release
+    assert "uv run --frozen python -I - <<'PY'" in release
+    assert release.count("uv run --frozen python -I -m schematic_airlock.release_artifacts") == 4
+    assert release.count("python -I -S src/schematic_airlock/release_artifacts.py") == 2
+
+
 def test_source_archive_includes_the_files_needed_by_its_tests() -> None:
     config = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
     profile = config["tool"]["hatch"]["build"]["targets"]["sdist"]

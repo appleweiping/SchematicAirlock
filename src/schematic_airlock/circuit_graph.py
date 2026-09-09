@@ -265,9 +265,12 @@ def build_circuit_graph(
         parameters: dict[str, Decimal],
         stack: tuple[str, ...],
     ) -> None:
-        if len(expanded_devices) > max_expanded_instances:
-            return
         for element in elements:
+            # Check before allocating every reached instance, including siblings
+            # in a flat scope. The independent cost above retains the overflow
+            # evidence used by callers to reject incomplete expansion.
+            if len(expanded_devices) >= max_expanded_instances:
+                return
             mapped_nodes = tuple(
                 "0"
                 if node.lower() == "0"
@@ -279,7 +282,11 @@ def build_circuit_graph(
             if element.kind == "X" and element.model is not None:
                 definition = definitions.get(element.model.lower())
                 expanded_devices.append(Device(path, replace(element, nodes=mapped_nodes)))
-                if definition is None or definition.name.lower() in stack:
+                if (
+                    definition is None
+                    or definition.name.lower() in stack
+                    or len(expanded_devices) >= max_expanded_instances
+                ):
                     continue
                 child_parameters = assignments_with_issues(
                     [f"{name}={value}" for name, value in definition.parameters],

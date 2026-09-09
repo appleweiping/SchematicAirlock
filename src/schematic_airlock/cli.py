@@ -11,6 +11,7 @@ from typing import Never, TextIO
 
 from schematic_airlock._output import write_report
 from schematic_airlock._version import __version__
+from schematic_airlock.dc_netlist import dc_report_json, dc_report_text, solve_dc_path
 from schematic_airlock.domain import AirlockError, Decision
 from schematic_airlock.engine import audit_path
 from schematic_airlock.fuzzing import fuzz_smoke
@@ -110,6 +111,15 @@ def _parser() -> argparse.ArgumentParser:
     voltage.add_argument("--pretty", action="store_true")
     voltage.add_argument("--output", help="write report to this file")
     voltage.add_argument("--force", action="store_true", help="replace an existing output")
+    linear_dc = subcommands.add_parser(
+        "linear-dc", help="solve the closed literal R/V/I DC profile"
+    )
+    linear_dc.add_argument("path", help="netlist file or confined bundle directory")
+    linear_dc.add_argument("--entry", help="bundle-relative entry netlist")
+    linear_dc.add_argument("--format", choices=("text", "json"), default="text")
+    linear_dc.add_argument("--pretty", action="store_true")
+    linear_dc.add_argument("--output", help="write report to this file")
+    linear_dc.add_argument("--force", action="store_true", help="replace an existing output")
     return parser
 
 
@@ -217,6 +227,16 @@ def main(
             return EXIT_GATE if report.decision.rank >= threshold.rank else EXIT_OK
         if args.command == "verification-check":
             return _verification(args, output)
+        if args.command == "linear-dc":
+            dc = solve_dc_path(args.path, entry=args.entry)
+            rendered = (
+                dc_report_json(dc, pretty=args.pretty)
+                if args.format == "json"
+                else dc_report_text(dc)
+            )
+            protected = tuple(Path(dc.root) / item.path for item in dc.files)
+            _write_output(rendered, args.output, output, protected=protected, force=args.force)
+            return EXIT_OK if dc.status == "solved" else EXIT_GATE
         if args.command == "voltage-check":
             voltage = check_voltages_path(args.path, entry=args.entry, rules=args.rules)
             rendered = (

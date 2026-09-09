@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "schematic-airlock"
-version = "0.5.0"
+version = "0.6.0"
 description = "Deterministic offline safety checks for generated SPICE artifacts"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -63,6 +63,7 @@ packages = ["src/schematic_airlock"]
 "docs/schemas/verification-report-v1.schema.json" = "schematic_airlock/schemas/verification-report-v1.schema.json"
 "docs/schemas/voltage-rules-v1.schema.json" = "schematic_airlock/schemas/voltage-rules-v1.schema.json"
 "docs/schemas/voltage-report-v1.schema.json" = "schematic_airlock/schemas/voltage-report-v1.schema.json"
+"docs/schemas/linear-dc-report-v1.schema.json" = "schematic_airlock/schemas/linear-dc-report-v1.schema.json"
 
 [tool.pytest.ini_options]
 addopts = [

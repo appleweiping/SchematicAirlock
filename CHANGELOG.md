@@ -2,6 +2,28 @@
 
 All notable changes are recorded here. Versions follow semantic versioning.
 
+## 0.6.0 - 2026-09-09
+
+### Added
+
+- Exact bounded sparse modified nodal analysis for nonnegative resistors and
+  independent DC sources, with independent current/voltage/power residual
+  verification and explicit singular, inconsistent and budget failures.
+- Closed literal R/V/I hierarchical netlist adapter, source-bound reports and
+  `linear-dc` CLI. Unsupported semantics never produce partial electrical values.
+- Independent dense Gauss-Jordan differential oracle (10,000 random networks)
+  and four real ngspice operating-point integration cases with ten voltage probes.
+
+### Fixed
+
+- Stop repeated include expansion after recording its existing unsupported
+  diagnostic, preventing exponentially repeated visits through a small DAG.
+- Enforce the reached-instance allocation cap within every hierarchy scope,
+  including flat primitive lists and sibling instances.
+- Reject malformed nameless subcircuit headers with typed syntax diagnostics.
+- Reject Unicode-confusable literal scales and quoted electrical expressions
+  in the closed linear DC profile while retaining quoted include paths/titles.
+
 ## 0.5.0 - 2026-09-09
 
 ### Added
