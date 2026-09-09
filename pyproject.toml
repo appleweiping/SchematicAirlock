@@ -46,8 +46,11 @@ Issues = "https://github.com/appleweiping/SchematicAirlock/issues"
 Source = "https://github.com/appleweiping/SchematicAirlock"
 
 [tool.hatch.build.targets.sdist]
-include = ["/src", "/tests", "/examples", "/docs", "/corpus", "/benchmarks", "/*.md", "/LICENSE", "/CITATION.cff"]
-exclude = ["/.github", "/uv.lock"]
+include = [
+  "/src", "/tests", "/examples", "/docs", "/corpus", "/benchmarks",
+  "/.github/workflows", "/.github/allowed_signers", "/uv.lock",
+  "/*.md", "/LICENSE", "/CITATION.cff",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/schematic_airlock"]
