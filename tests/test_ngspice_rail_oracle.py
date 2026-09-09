@@ -197,7 +197,7 @@ def test_incomplete_output_fails_closed(harness: dict[str, Any]) -> None:
 
 def test_binary_hash_is_checked_before_execution(harness: dict[str, Any]) -> None:
     with pytest.raises(harness["OracleError"], match="executable hash mismatch"):
-        harness["run"](sys.executable, "0" * 64)
+        harness["run"](Path(sys.executable).resolve(strict=True), "0" * 64)
 
 
 def test_empty_executable_is_rejected_before_hash_or_execution(
@@ -210,9 +210,22 @@ def test_empty_executable_is_rejected_before_hash_or_execution(
         harness["run"](empty, hashlib.sha256(b"").hexdigest())
 
 
-def test_non_ngspice_executable_fails_the_version_gate(harness: dict[str, Any]) -> None:
+def test_non_ngspice_executable_fails_the_version_gate(
+    harness: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
     executable = Path(sys.executable).resolve(strict=True)
     executable_hash = hashlib.sha256(executable.read_bytes()).hexdigest()
+
+    def non_ngspice_version(command: list[str], **arguments: Any) -> int:
+        assert command == [str(executable), "-v"]
+        # A controlled protocol fixture, not a simulator run. Python's '-v'
+        # means verbose imports and is not a portable substitute for ngspice's
+        # version option; process/output guards are exercised separately below.
+        arguments["stdout_path"].write_bytes(b"A different executable version 1\n")
+        arguments["stderr_path"].write_bytes(b"")
+        return 0
+
+    monkeypatch.setitem(harness["run"].__globals__, "_run_bounded", non_ngspice_version)
 
     with pytest.raises(harness["OracleError"], match="did not report ngspice-42"):
         harness["run"](executable, executable_hash)
